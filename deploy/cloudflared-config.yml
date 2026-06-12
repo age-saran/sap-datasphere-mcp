@@ -1,0 +1,45 @@
+# ============================================================
+# Cloudflare Tunnel Configuration
+# /etc/cloudflared/config.yml
+# ============================================================
+#
+# How to create a tunnel:
+#   1. cloudflared tunnel login
+#   2. cloudflared tunnel create sap-datasphere-mcp
+#   3. Copy the tunnel ID and credentials-file path here
+#   4. cloudflared tunnel route dns sap-datasphere-mcp mcp.yourdomain.com
+#
+# Or use a quick "Try Cloudflare Tunnel" (no domain needed):
+#   cloudflared tunnel --url http://localhost:8080
+#   (it will print a random *.trycloudflare.com URL)
+# ============================================================
+
+# Replace with your actual Tunnel ID from step 2 above
+tunnel: YOUR-TUNNEL-ID-HERE
+
+# Path to the credentials JSON generated during tunnel creation
+credentials-file: /root/.cloudflared/YOUR-TUNNEL-ID-HERE.json
+
+# ── Ingress Rules ────────────────────────────────────────────
+# All traffic from the internet is routed to the local MCP server
+ingress:
+  # All requests → MCP server on localhost:8080
+  # The server exposes:
+  #   /mcp            → MCP Streamable HTTP (Claude Client)
+  #   /api/tools/*    → REST API (Gemini Enterprise / M365 Copilot)
+  #   /openapi.json   → OpenAPI spec
+  #   /health         → Health probe
+  - service: http://localhost:8080
+
+# ── Optional: hostname-based routing ─────────────────────────
+# Uncomment and set your domain if using a named tunnel:
+#
+# ingress:
+#   - hostname: mcp.yourdomain.com
+#     service: http://localhost:8080
+#   - service: http_status:404
+
+# ── Cloudflare Access (Zero Trust) ───────────────────────────
+# Optionally restrict who can reach the tunnel via Cloudflare Access policies.
+# Set up in: Cloudflare Dashboard → Zero Trust → Access → Applications
+# This is in addition to the MCP_HTTP_AUTH_TOKEN bearer token.

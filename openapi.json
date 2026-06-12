@@ -1,0 +1,2712 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SAP Datasphere MCP — REST API",
+    "version": "1.0.0",
+    "description": "REST wrapper around SAP Datasphere MCP. 44 tools available. Used by M365 Copilot Studio and Gemini Enterprise."
+  },
+  "servers": [
+    {
+      "url": "https://YOUR-TUNNEL.trycloudflare.com",
+      "description": "Cloudflare Tunnel (production)"
+    },
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "description": "Set MCP_HTTP_AUTH_TOKEN in .env; pass as Authorization: Bearer <token>"
+      }
+    }
+  },
+  "paths": {
+    "/api/tools/list_spaces": {
+      "post": {
+        "operationId": "list_spaces",
+        "summary": "List all SAP Datasphere spaces with their status and metadata",
+        "description": "List all SAP Datasphere spaces with their status and metadata.\n\n**Use this tool when:**\n- User asks \"What spaces are available?\" or \"Show me all spaces\"\n- You need to discover available Datasphere environments\n- Starting data exploration workflow\n- Checking space status and availability\n\n**What you'll get:**\n- Space IDs and names\n- Space status (ACTIVE, DEVELOPMENT, etc.)\n- Table/view counts per space\n- Owner information (with include_details=True)\n\n**Example queries:**\n- \"What Datasphere spaces exist?\"\n- \"Show me all data spaces\"\n- \"Which spaces are active?\"\n\n**Next steps after using this tool:**\n- Use get_space_info() to explore a specific space\n- Use search_tables() to find tables across spaces\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "include_details": {
+                        "type": "boolean",
+                        "description": "Set to true to include detailed information (owner, created date, connection counts). Default: false for quick space listing.",
+                        "default": false
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_space_info": {
+      "post": {
+        "operationId": "get_space_info",
+        "summary": "Get comprehensive information about a specific SAP Datasphere space",
+        "description": "Get comprehensive information about a specific SAP Datasphere space.\n\n**Use this tool when:**\n- User asks about a specific space (e.g., \"Tell me about SALES_ANALYTICS\")\n- You need to see what tables/views exist in a space\n- Checking space configuration and metadata\n- Following up from list_spaces() results\n\n**What you'll get:**\n- Complete space metadata (status, owner, created date)\n- List of all tables and views in the space\n- Table schemas and row counts\n- Connection information\n\n**Required parameter:**\n- space_id: Must be uppercase (e.g., 'SALES_ANALYTICS', 'FINANCE_DWH')\n\n**Example queries:**\n- \"Show me the SALES_ANALYTICS space\"\n- \"What tables are in FINANCE_DWH?\"\n- \"Tell me about the HR_ANALYTICS space\"\n\n**Error handling:**\n- If space not found, list_spaces() will show available spaces\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "space_id": {
+                        "type": "string",
+                        "description": "The space ID in UPPERCASE format (e.g., 'SALES_ANALYTICS', 'FINANCE_DWH', 'HR_ANALYTICS'). Must match exactly."
+                      }
+                    },
+                    "required": [
+                      "space_id"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/search_tables": {
+      "post": {
+        "operationId": "search_tables",
+        "summary": "Search for tables and views across all Datasphere spaces by name or description",
+        "description": "Search for tables and views across all Datasphere spaces by name or description.\n\n**Use this tool when:**\n- User asks \"Find tables with customer data\"\n- Looking for tables containing specific keywords\n- Don't know exact table name but know the domain\n- Searching across multiple spaces\n\n**Search behavior:**\n- Searches both table names and descriptions\n- Case-insensitive matching\n- Returns results from all spaces (or specific space if filtered)\n- Includes table metadata (type, columns, row counts)\n\n**Search tips:**\n- Use domain keywords: \"customer\", \"sales\", \"order\", \"finance\"\n- Partial matches work: \"cust\" finds \"CUSTOMER_DATA\"\n- Filter by space_id to narrow results\n\n**Example queries:**\n- \"Find all tables related to customers\"\n- \"Search for sales order tables\"\n- \"Show me all tables with 'finance' in the name\"\n\n**Next steps:**\n- Use get_table_schema() for detailed column information\n- Use execute_query() to retrieve actual data\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "search_term": {
+                        "type": "string",
+                        "description": "Keyword to search for in table names and descriptions (e.g., 'customer', 'sales', 'order'). Case-insensitive, partial matches work."
+                      },
+                      "space_id": {
+                        "type": "string",
+                        "description": "Optional: Filter results to a specific space (e.g., 'SALES_ANALYTICS'). Leave empty to search all spaces."
+                      }
+                    },
+                    "required": [
+                      "search_term"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_table_schema": {
+      "post": {
+        "operationId": "get_table_schema",
+        "summary": "Get detailed schema information for a specific table or view",
+        "description": "Get detailed schema information for a specific table or view.\n\n**Use this tool when:**\n- User asks \"What columns are in CUSTOMER_DATA?\"\n- Need to understand table structure before querying\n- Planning JOIN operations (need to see key columns)\n- Checking data types for analysis\n\n**What you'll get:**\n- Complete column list with data types\n- Primary key indicators\n- Column descriptions\n- Table metadata (row count, last updated)\n\n**Required parameters:**\n- space_id: The space containing the table (uppercase)\n- table_name: Exact table name (case-sensitive, usually uppercase)\n\n**Example queries:**\n- \"Show me the schema of CUSTOMER_DATA in SALES_ANALYTICS\"\n- \"What columns does SALES_ORDERS have?\"\n- \"Describe the GL_ACCOUNTS table structure\"\n\n**Best practices:**\n- Use search_tables() first if you don't know the exact table name\n- Check column types before writing queries\n- Identify key columns for JOINs\n\n**Next steps:**\n- Use execute_query() with proper column names and types\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "space_id": {
+                        "type": "string",
+                        "description": "The space ID containing the table (e.g., 'SALES_ANALYTICS'). Must be uppercase."
+                      },
+                      "table_name": {
+                        "type": "string",
+                        "description": "Exact table or view name (e.g., 'CUSTOMER_DATA', 'SALES_ORDERS'). Case-sensitive, typically uppercase."
+                      }
+                    },
+                    "required": [
+                      "space_id",
+                      "table_name"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/list_connections": {
+      "post": {
+        "operationId": "list_connections",
+        "summary": "List all external data source connections and their current status",
+        "description": "List all external data source connections and their current status.\n\n**Use this tool when:**\n- User asks \"What data sources are connected?\"\n- Checking connection health and availability\n- Understanding data lineage and sources\n- Troubleshooting data refresh issues\n\n**What you'll get:**\n- Connection IDs and names\n- Connection types (SAP_ERP, SALESFORCE, EXTERNAL, etc.)\n- Connection status (CONNECTED, DISCONNECTED, ERROR)\n- Host information and last tested timestamp\n\n**Supported connection types:**\n- SAP_ERP, SAP_S4HANA, SAP_BW\n- SALESFORCE, EXTERNAL\n- SNOWFLAKE, DATABRICKS\n- POSTGRESQL, MYSQL, ORACLE, SQLSERVER, HANA\n\n**Example queries:**\n- \"What external connections exist?\"\n- \"Show me all SAP ERP connections\"\n- \"Check if Salesforce connection is active\"\n\n**Use cases:**\n- Data integration monitoring\n- Connection health checks\n- Understanding data sources\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "connection_type": {
+                        "type": "string",
+                        "description": "Optional: Filter by specific connection type (e.g., 'SAP_ERP', 'SALESFORCE', 'EXTERNAL'). Leave empty to show all connections."
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_task_status": {
+      "post": {
+        "operationId": "get_task_status",
+        "summary": "Get status and execution details of data integration and ETL tasks",
+        "description": "Get status and execution details of data integration and ETL tasks.\n\n**Use this tool when:**\n- User asks \"What tasks are running?\"\n- Monitoring data pipeline execution\n- Checking when data was last refreshed\n- Troubleshooting failed tasks\n\n**What you'll get:**\n- Task IDs and names\n- Execution status (COMPLETED, RUNNING, FAILED, SCHEDULED)\n- Last run timestamp and next scheduled run\n- Execution duration and records processed\n- Associated space information\n\n**Filtering options:**\n- No parameters: Show all tasks\n- task_id: Get specific task details\n- space_id: Show all tasks for a space\n\n**Example queries:**\n- \"What tasks are currently running?\"\n- \"Show me all tasks in SALES_ANALYTICS\"\n- \"When did DAILY_SALES_ETL last run?\"\n- \"Check status of task FINANCE_RECONCILIATION\"\n\n**Task types:**\n- ETL/data loading tasks\n- Transformation workflows\n- Scheduled data refreshes\n- Data replication jobs\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "task_id": {
+                        "type": "string",
+                        "description": "Optional: Specific task ID to check (e.g., 'DAILY_SALES_ETL'). Leave empty to see all tasks."
+                      },
+                      "space_id": {
+                        "type": "string",
+                        "description": "Optional: Filter tasks by space (e.g., 'SALES_ANALYTICS'). Shows only tasks associated with that space."
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/browse_marketplace": {
+      "post": {
+        "operationId": "browse_marketplace",
+        "summary": "Browse and search available data packages in the SAP Datasphere marketplace",
+        "description": "Browse and search available data packages in the SAP Datasphere marketplace.\n\n**Use this tool when:**\n- User asks \"What data packages are available?\"\n- Looking for external reference data (benchmarks, currency rates, etc.)\n- Exploring marketplace offerings\n- Planning to enrich internal data with external sources\n\n**What you'll get:**\n- Package IDs and names\n- Package descriptions and categories\n- Provider information\n- Package versions and sizes\n- Pricing information (Free or paid)\n\n**Categories:**\n- Reference Data (industry benchmarks, standards)\n- Financial Data (currency rates, market data)\n- Geospatial Data\n- Industry-specific datasets\n\n**Example queries:**\n- \"What marketplace packages are available?\"\n- \"Find financial data packages\"\n- \"Show me industry benchmarks\"\n- \"Search for currency rate data\"\n\n**Use cases:**\n- Data enrichment planning\n- Finding external reference data\n- Competitive benchmarking\n- Currency conversion support\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "category": {
+                        "type": "string",
+                        "description": "Optional: Filter by category (e.g., 'Reference Data', 'Financial Data'). Leave empty to browse all."
+                      },
+                      "search_term": {
+                        "type": "string",
+                        "description": "Optional: Search keyword for package names or descriptions (e.g., 'currency', 'benchmark'). Case-insensitive."
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/find_assets_by_column": {
+      "post": {
+        "operationId": "find_assets_by_column",
+        "summary": "Find all assets (tables/views) containing a specific column name across SAP Datasphere spaces",
+        "description": "Find all assets (tables/views) containing a specific column name across SAP Datasphere spaces.\n\n**Use this tool when:**\n- User asks \"Which tables contain CUSTOMER_ID?\"\n- Performing data lineage analysis\n- Impact analysis before schema changes\n- Finding datasets for specific use cases\n- Locating related data across spaces\n\n**What you'll get:**\n- Asset names and types (View, Table, etc.)\n- Space IDs where assets are located\n- Column information (name, type, position)\n- Total column count per asset\n- Consumption URLs for data access\n\n**Use cases:**\n- Data lineage discovery (find all uses of a column)\n- Impact analysis (before renaming/removing columns)\n- Dataset discovery (find tables with specific fields)\n- Cross-space data exploration\n- Schema relationship mapping\n\n**Example queries:**\n- \"Find all tables with CUSTOMER_ID column\"\n- \"Which views contain SALES_AMOUNT?\"\n- \"Show me assets with COUNTRY_CODE in SAP_CONTENT space\"\n- \"List tables that have ORDER_DATE column\"\n\n**Performance notes:**\n- Searches across multiple spaces by default\n- Uses intelligent caching for better performance\n- Results limited to 50 assets by default (configurable)\n- Case-insensitive search by default\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "column_name": {
+                        "type": "string",
+                        "description": "Column name to search for (case-insensitive by default). Examples: 'CUSTOMER_ID', 'SALES_AMOUNT', 'ORDER_DATE'"
+                      },
+                      "space_id": {
+                        "type": "string",
+                        "description": "Optional: Limit search to specific space (e.g., 'SAP_CONTENT'). Leave empty to search all spaces."
+                      },
+                      "max_assets": {
+                        "type": "integer",
+                        "description": "Optional: Maximum number of matching assets to return (1-200). Default: 50",
+                        "minimum": 1,
+                        "maximum": 200,
+                        "default": 50
+                      },
+                      "case_sensitive": {
+                        "type": "boolean",
+                        "description": "Optional: Perform case-sensitive column name matching. Default: false",
+                        "default": false
+                      }
+                    },
+                    "required": [
+                      "column_name"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/analyze_column_distribution": {
+      "post": {
+        "operationId": "analyze_column_distribution",
+        "summary": "Perform advanced statistical analysis of a column's data distribution including nulls, distinct values, percentiles, and",
+        "description": "Perform advanced statistical analysis of a column's data distribution including nulls, distinct values, percentiles, and outlier detection.\n\n**Use this tool when:**\n- User asks \"What's the data quality of AMOUNT column?\"\n- Performing data profiling before analytics\n- Assessing column completeness and distribution\n- Detecting outliers and data anomalies\n- Understanding data patterns for ML/AI\n\n**What you'll get:**\n- Basic statistics (count, nulls, distinct values, completeness)\n- Numeric statistics (min, max, mean, percentiles)\n- Distribution analysis (top values, frequency)\n- Outlier detection (IQR method)\n- Data quality assessment\n\n**Use cases:**\n- Data quality assessment\n- Pre-analytics data profiling\n- Outlier and anomaly detection\n- Understanding value distributions\n- ML feature engineering preparation\n- Data cleansing planning\n\n**Example queries:**\n- \"Analyze the distribution of SALES_AMOUNT column\"\n- \"What's the data quality of CUSTOMER_AGE?\"\n- \"Profile the ORDER_STATUS column\"\n- \"Detect outliers in PRICE column\"\n- \"Show me statistics for QUANTITY field\"\n\n**Analysis includes:**\n- Null percentage and completeness rate\n- Distinct value count and cardinality\n- For numeric columns: min, max, mean, percentiles (p25, p50, p75)\n- Top value frequencies\n- Outlier detection using IQR method\n- Data quality recommendations\n\n**Performance notes:**\n- Analyzes up to 10,000 records (configurable)\n- Default sample size: 1,000 records\n- Works with numeric, string, and date columns\n- Automatic type detection and appropriate statistics\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "space_id": {
+                        "type": "string",
+                        "description": "Space ID containing the asset (e.g., 'SAP_CONTENT', 'SALES_ANALYTICS')"
+                      },
+                      "asset_name": {
+                        "type": "string",
+                        "description": "Asset (table/view) name containing the column"
+                      },
+                      "column_name": {
+                        "type": "string",
+                        "description": "Column name to analyze (e.g., 'SALES_AMOUNT', 'CUSTOMER_AGE', 'ORDER_STATUS')"
+                      },
+                      "sample_size": {
+                        "type": "integer",
+                        "description": "Optional: Number of records to analyze (10-10000). Default: 1000. Larger samples = more accurate but slower.",
+                        "minimum": 10,
+                        "maximum": 10000,
+                        "default": 1000
+                      },
+                      "include_outliers": {
+                        "type": "boolean",
+                        "description": "Optional: Detect and report outliers using IQR method. Default: true",
+                        "default": true
+                      }
+                    },
+                    "required": [
+                      "space_id",
+                      "asset_name",
+                      "column_name"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/execute_query": {
+      "post": {
+        "operationId": "execute_query",
+        "summary": "Execute read-only SQL queries against SAP Datasphere tables to retrieve and analyze data",
+        "description": "Execute read-only SQL queries against SAP Datasphere tables to retrieve and analyze data.\n\n**IMPORTANT: This is a HIGH-RISK tool that requires user consent before execution.**\n\n**Use this tool when:**\n- User explicitly requests data retrieval (e.g., \"Show me customers from USA\")\n- Need to perform data analysis with aggregations\n- Joining multiple tables for insights\n- Filtering and sorting data\n\n**Capabilities:**\n- SELECT queries with full SQL syntax (WHERE, JOIN, GROUP BY, ORDER BY, LIMIT)\n- Read-only access - NO write operations allowed\n- Results limited to 100 rows by default (configurable via limit parameter)\n- Automatic query sanitization and injection prevention\n\n**Security & Restrictions:**\n- Only SELECT statements allowed\n- Blocked operations: INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, etc.\n- No SQL comments allowed (security risk)\n- Queries sanitized to prevent injection attacks\n- User consent required before execution (high-risk operation)\n\n**Query best practices:**\n1. Always specify a LIMIT to control result size\n2. Use WHERE clauses to filter data efficiently\n3. Check table schema first with get_table_schema()\n4. Use qualified table names when joining\n\n**Example queries:**\n- \"SELECT * FROM CUSTOMER_DATA WHERE country = 'USA' LIMIT 10\"\n- \"SELECT customer_id, SUM(amount) as total FROM SALES_ORDERS GROUP BY customer_id ORDER BY total DESC LIMIT 20\"\n- \"SELECT c.customer_name, o.order_date, o.amount FROM CUSTOMER_DATA c JOIN SALES_ORDERS o ON c.customer_id = o.customer_id WHERE o.status = 'COMPLETED' LIMIT 50\"\n\n**Error handling:**\n- Invalid SQL syntax: Returns syntax error with guidance\n- Forbidden operations: Blocked with explanation\n- Missing tables: Suggests using search_tables() to find correct name\n- Permission denied: Explains consent requirement\n\n**Note:** This tool uses mock data in development. Real query execution requires OAuth authentication.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "space_id": {
+                        "type": "string",
+                        "description": "The Datasphere space ID where tables exist (e.g., 'SALES_ANALYTICS', 'FINANCE_DWH'). Must be uppercase."
+                      },
+                      "sql_query": {
+                        "type": "string",
+                        "description": "The SELECT query to execute. Must start with SELECT. Examples: 'SELECT * FROM CUSTOMER_DATA LIMIT 10', 'SELECT customer_id, COUNT(*) FROM SALES_ORDERS GROUP BY customer_id'"
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of rows to return. Default: 100. Range: 1-1000. Use smaller limits for faster responses.",
+                        "default": 100
+                      }
+                    },
+                    "required": [
+                      "space_id",
+                      "sql_query"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/smart_query": {
+      "post": {
+        "operationId": "smart_query",
+        "summary": "🚀 **SMART QUERY** - Intelligent query router that automatically selects the best execution method for your query",
+        "description": "🚀 **SMART QUERY** - Intelligent query router that automatically selects the best execution method for your query.\n\n**NEW in v1.0.5** - This is a composite tool combining execute_query, query_relational_entity, and query_analytical_data with intelligent routing and fallback logic.\n\n**Why use smart_query instead of individual query tools?**\n- ✅ Automatic routing to the most reliable method\n- ✅ Fallback handling if primary method fails\n- ✅ No need to understand different query methods\n- ✅ Better error recovery and diagnostics\n- ✅ Performance optimization based on query type\n\n**How it works:**\n1. **Analyzes your query** - Detects SQL syntax, aggregations, complexity\n2. **Routes intelligently** - Chooses the best execution method:\n   - Aggregations (SUM, COUNT, GROUP BY) → Analytical endpoint\n   - Simple SELECT → Relational endpoint (most reliable)\n   - Complex SQL → SQL parsing with OData conversion\n3. **Falls back gracefully** - If primary method fails, tries alternatives\n4. **Returns detailed logs** - Shows routing decisions and execution path\n\n**Query Modes:**\n- `auto` (default) - Intelligent routing based on query analysis\n- `relational` - Force use of relational endpoint (most reliable)\n- `analytical` - Force use of analytical endpoint (for aggregations)\n- `sql` - Force use of SQL parsing method\n\n**Use this tool when:**\n- You want reliable query execution without worrying about method selection\n- You're unsure which query method to use\n- You need fallback handling for production reliability\n- You want to see execution diagnostics\n\n**Supported query patterns:**\n- Simple SELECT: `SELECT * FROM SAP_SC_FI_V_ProductsDim LIMIT 10`\n- Filtering: `SELECT * FROM table WHERE PRICE > 1000`\n- Column selection: `SELECT PRODUCTID, PRICE FROM table`\n- Aggregations: `SELECT COMPANYNAME, SUM(GROSSAMOUNT) FROM table GROUP BY COMPANYNAME`\n- Sorting: `SELECT * FROM table ORDER BY PRICE DESC LIMIT 5`\n\n**Parameters:**\n- `space_id` - Space ID (e.g., \"SAP_CONTENT\")\n- `query` - SQL query or natural language request\n- `mode` - Routing mode: \"auto\", \"relational\", \"analytical\", \"sql\" (default: \"auto\")\n- `limit` - Max rows to return (default: 1000)\n- `include_metadata` - Include routing logs and decisions (default: true)\n- `fallback` - Enable fallback to alternative methods (default: true)\n\n**Example queries:**\n```\n# Auto-routing - simple SELECT\nsmart_query(space_id=\"SAP_CONTENT\", query=\"SELECT * FROM SAP_SC_FI_V_ProductsDim LIMIT 5\")\n\n# Auto-routing - aggregation\nsmart_query(space_id=\"SAP_CONTENT\", query=\"SELECT COMPANYNAME, SUM(GROSSAMOUNT) FROM SAP_SC_SALES_V_SalesOrders GROUP BY COMPANYNAME\")\n\n# Force relational mode\nsmart_query(space_id=\"SAP_CONTENT\", query=\"SELECT * FROM SAP_SC_FI_V_ProductsDim\", mode=\"relational\")\n\n# Disable fallback (fail fast)\nsmart_query(space_id=\"SAP_CONTENT\", query=\"SELECT * FROM table\", fallback=False)\n```\n\n**Response includes:**\n- Query results (data)\n- Method used (relational, analytical, sql, or fallback)\n- Execution time\n- Rows returned\n- Routing decision log (if include_metadata=true)\n- Detected query characteristics\n\n**Error handling:**\n- If primary method fails, automatically tries fallbacks\n- Returns detailed error log showing all attempted methods\n- Provides suggestions for fixing query issues\n- Shows routing decisions for debugging\n\n**Performance:**\n- Relational: 1-5 seconds, up to 50K records\n- Analytical: Fast for aggregations\n- SQL: 1-5 seconds, up to 1K records\n\n**When to use individual tools instead:**\n- Use `query_relational_entity` when you need specific entity_name control\n- Use `query_analytical_data` when you know you need analytical consumption\n- Use `execute_query` when you need exact SQL syntax control\n- Use `smart_query` for everything else (recommended for most use cases)\n\n**Note:** This tool provides the same functionality as the individual query tools but with better reliability through intelligent routing and fallback handling.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "space_id": {
+                        "type": "string",
+                        "description": "The Datasphere space ID (e.g., 'SAP_CONTENT', 'SALES'). Must match existing space."
+                      },
+                      "query": {
+                        "type": "string",
+                        "description": "SQL query to execute. Examples: 'SELECT * FROM table LIMIT 10', 'SELECT col1, SUM(col2) FROM table GROUP BY col1'"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "auto",
+                          "relational",
+                          "analytical",
+                          "sql"
+                        ],
+                        "description": "Query execution mode. Use 'auto' for intelligent routing (recommended). Default: 'auto'",
+                        "default": "auto"
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of rows to return. Default: 1000. Range: 1-50000",
+                        "default": 1000
+                      },
+                      "include_metadata": {
+                        "type": "boolean",
+                        "description": "Include execution logs and routing decisions in response. Useful for debugging. Default: true",
+                        "default": true
+                      },
+                      "fallback": {
+                        "type": "boolean",
+                        "description": "Enable fallback to alternative query methods if primary fails. Default: true",
+                        "default": true
+                      }
+                    },
+                    "required": [
+                      "space_id",
+                      "query"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/list_catalog_assets": {
+      "post": {
+        "operationId": "list_catalog_assets",
+        "summary": "Browse all data assets across all SAP Datasphere spaces",
+        "description": "Browse all data assets across all SAP Datasphere spaces.\n\n**Use this tool when:**\n- User asks \"What assets are available in Datasphere?\"\n- Building a complete data catalog or asset inventory\n- Discovering available data assets across all spaces\n- Searching for specific asset types across the system\n- Understanding the overall data landscape\n\n**What you'll get:**\n- Asset IDs and names across all spaces\n- Asset types (AnalyticalModel, View, Table)\n- Space information for each asset\n- Consumption URLs (analytical and relational)\n- Exposure status and metadata URLs\n- Creation and modification timestamps\n\n**Available parameters:**\n- select_fields: Specific fields to return (e.g., ['name', 'description', 'spaceId'])\n- filter_expression: OData filter (e.g., \"spaceId eq 'SAP_CONTENT'\")\n- top: Maximum results (default 50, max 1000)\n- skip: Results to skip for pagination\n- include_count: Include total count of assets\n\n**Example queries:**\n- \"List all available assets in Datasphere\"\n- \"Show me all analytical models across all spaces\"\n- \"Find assets in the SAP_CONTENT space\"\n- \"List the first 20 assets with their consumption URLs\"\n\n**Common filters:**\n- By space: `filter_expression=\"spaceId eq 'SAP_CONTENT'\"`\n- By type: `filter_expression=\"assetType eq 'AnalyticalModel'\"`\n- Exposed only: `filter_expression=\"exposedForConsumption eq true\"`\n- Combined: `filter_expression=\"spaceId eq 'SALES' and assetType eq 'View'\"`\n\n**Asset types you'll see:**\n- AnalyticalModel: Multi-dimensional models for analytics\n- View: SQL views combining multiple data sources\n- Table: Physical tables with business data\n- Fact: Fact tables in analytical models\n- Dimension: Dimension tables in analytical models\n\n**Note:** This uses the Catalog API: GET /api/v1/datasphere/consumption/catalog/assets\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "select_fields": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Specific fields to return (e.g., ['name', 'description', 'spaceId']). If not specified, returns all fields."
+                      },
+                      "filter_expression": {
+                        "type": "string",
+                        "description": "OData filter expression (e.g., \"spaceId eq 'SAP_CONTENT'\" or \"assetType eq 'AnalyticalModel'\")."
+                      },
+                      "top": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default: 50, max: 1000).",
+                        "default": 50
+                      },
+                      "skip": {
+                        "type": "integer",
+                        "description": "Number of results to skip for pagination (default: 0).",
+                        "default": 0
+                      },
+                      "include_count": {
+                        "type": "boolean",
+                        "description": "Include total count of matching assets (default: false).",
+                        "default": false
+                      }
+                    },
+                    "required": []
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_asset_details": {
+      "post": {
+        "operationId": "get_asset_details",
+        "summary": "Get comprehensive metadata for a specific SAP Datasphere asset",
+        "description": "Get comprehensive metadata for a specific SAP Datasphere asset.\n\n**Use this tool when:**\n- User asks \"Show me details about the Financial Transactions asset\"\n- Need complete asset documentation and structure\n- Want to understand asset dimensions, measures, and relationships\n- Looking for consumption URLs to access the data\n- Checking asset business purpose and technical details\n- Validating asset availability before integration\n\n**What you'll get:**\n- Complete asset metadata (name, description, business purpose)\n- Space information and ownership details\n- Asset type and consumption type (analytical/relational)\n- Consumption URLs for data access\n- Metadata URLs for schema information\n- Dimensions and measures (for analytical models)\n- Relationships to other assets\n- Technical details (row count, size, refresh info)\n- Business context (domain, classification, retention)\n- Version and status information\n- Tags and categorization\n\n**Required parameters:**\n- space_id: The space containing the asset (e.g., 'SAP_CONTENT')\n- asset_id: The asset identifier (e.g., 'SAP_SC_FI_AM_FINTRANSACTIONS')\n\n**Optional parameters:**\n- expand_fields: Related entities to expand (e.g., ['columns', 'relationships'])\n\n**Example queries:**\n- \"Get details for SAP_SC_FI_AM_FINTRANSACTIONS in SAP_CONTENT\"\n- \"Show me the structure of the Financial Transactions asset\"\n- \"What are the dimensions and measures of this analytical model?\"\n- \"Give me the consumption URL for the Sales Data View\"\n\n**Use cases:**\n- Understand asset structure before querying\n- Get consumption URLs for data access\n- Review asset business purpose and classification\n- Check asset relationships and dependencies\n- Validate data freshness (last refresh time)\n- Generate asset documentation\n\n**Note:** This uses the Catalog API: GET /api/v1/datasphere/consumption/catalog/spaces('{spaceId}')/assets('{assetId}')\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "space_id": {
+                        "type": "string",
+                        "description": "The space ID in UPPERCASE format (e.g., 'SAP_CONTENT', 'SALES_ANALYTICS'). Must match exactly."
+                      },
+                      "asset_id": {
+                        "type": "string",
+                        "description": "The asset identifier (e.g., 'SAP_SC_FI_AM_FINTRANSACTIONS', 'CUSTOMER_VIEW')."
+                      },
+                      "expand_fields": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Related entities to expand (e.g., ['columns', 'relationships', 'metadata'])."
+                      }
+                    },
+                    "required": [
+                      "space_id",
+                      "asset_id"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_asset_by_compound_key": {
+      "post": {
+        "operationId": "get_asset_by_compound_key",
+        "summary": "Retrieve asset using OData compound key identifier (alternative access method)",
+        "description": "Retrieve asset using OData compound key identifier (alternative access method).\n\n**Use this tool when:**\n- You have both space ID and asset ID ready\n- Want direct access without knowing the exact endpoint structure\n- Working with bookmarked or favorited assets\n- Have pre-known asset identifiers from other systems\n- Need to resolve cross-references quickly\n\n**What you'll get:**\n- Same comprehensive metadata as get_asset_details\n- Complete asset information with consumption URLs\n- All dimensions, measures, and relationships\n- Technical and business context\n\n**Required parameters:**\n- space_id: The space identifier\n- asset_id: The asset identifier\n\n**How it works:**\nThis tool combines space_id and asset_id into an OData compound key format:\n`spaceId='SAP_CONTENT',assetId='SAP_SC_FI_AM_FINTRANSACTIONS'`\n\n**Example queries:**\n- \"Get asset SAP_SC_FI_AM_FINTRANSACTIONS from SAP_CONTENT using compound key\"\n- \"Retrieve CUSTOMER_VIEW in SALES_SPACE\"\n\n**When to use this vs get_asset_details:**\n- **Use this**: When you want simplified parameter passing\n- **Use get_asset_details**: When you need expand options or prefer explicit endpoint\n\n**Note:** This uses the Catalog API: GET /api/v1/datasphere/consumption/catalog/assets({compoundKey})\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "space_id": {
+                        "type": "string",
+                        "description": "The space identifier in UPPERCASE (e.g., 'SAP_CONTENT', 'SALES_SPACE')."
+                      },
+                      "asset_id": {
+                        "type": "string",
+                        "description": "The asset identifier (e.g., 'SAP_SC_FI_AM_FINTRANSACTIONS', 'CUSTOMER_VIEW')."
+                      }
+                    },
+                    "required": [
+                      "space_id",
+                      "asset_id"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_space_assets": {
+      "post": {
+        "operationId": "get_space_assets",
+        "summary": "List all data assets within a specific SAP Datasphere space",
+        "description": "List all data assets within a specific SAP Datasphere space.\n\n**Use this tool when:**\n- User asks \"What assets are in the SAP_CONTENT space?\"\n- Browsing assets within a specific space\n- Creating a space-specific asset inventory\n- Filtering assets by type within a space\n- Validating space contents and available data\n- Understanding what data is available in a space\n\n**What you'll get:**\n- All assets within the specified space\n- Asset names, descriptions, and types\n- Exposure status for each asset\n- Consumption URLs (analytical and relational)\n- Creation and modification timestamps\n- Asset counts and pagination info\n\n**Required parameters:**\n- space_id: The space to browse (e.g., 'SAP_CONTENT')\n\n**Optional parameters:**\n- filter_expression: Filter by asset type or other criteria\n- top: Maximum results (default 50, max 1000)\n- skip: Results to skip for pagination\n\n**Example queries:**\n- \"List all assets in the SAP_CONTENT space\"\n- \"Show me analytical models in SALES_ANALYTICS\"\n- \"What tables are available in FINANCE_SPACE?\"\n- \"List exposed assets in SAP_CONTENT\"\n\n**Common filters:**\n- By type: `filter_expression=\"assetType eq 'AnalyticalModel'\"`\n- Exposed only: `filter_expression=\"exposedForConsumption eq true\"`\n- By name pattern: `filter_expression=\"contains(name, 'Financial')\"`\n- Combined: `filter_expression=\"assetType eq 'View' and exposedForConsumption eq true\"`\n\n**Asset types:**\n- **AnalyticalModel**: Multi-dimensional models with dimensions and measures\n- **View**: SQL views combining data from multiple sources\n- **Table**: Physical tables with business data\n- **Fact**: Fact tables in dimensional models\n- **Dimension**: Dimension tables for analysis\n\n**Use cases:**\n- Space content discovery\n- Asset inventory generation\n- Data availability validation\n- Finding specific asset types\n- Understanding space data landscape\n\n**Note:** This uses the Catalog API: GET /api/v1/datasphere/consumption/catalog/spaces('{spaceId}')/assets\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "space_id": {
+                        "type": "string",
+                        "description": "The space ID in UPPERCASE format (e.g., 'SAP_CONTENT', 'SALES_ANALYTICS'). Must match exactly."
+                      },
+                      "filter_expression": {
+                        "type": "string",
+                        "description": "OData filter expression (e.g., \"assetType eq 'AnalyticalModel'\" or \"exposedForConsumption eq true\")."
+                      },
+                      "top": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default: 50, max: 1000).",
+                        "default": 50
+                      },
+                      "skip": {
+                        "type": "integer",
+                        "description": "Number of results to skip for pagination (default: 0).",
+                        "default": 0
+                      }
+                    },
+                    "required": [
+                      "space_id"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/test_connection": {
+      "post": {
+        "operationId": "test_connection",
+        "summary": "Invoke the test_connection tool",
+        "description": "Invoke the test_connection tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_current_user": {
+      "post": {
+        "operationId": "get_current_user",
+        "summary": "Invoke the get_current_user tool",
+        "description": "Invoke the get_current_user tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_tenant_info": {
+      "post": {
+        "operationId": "get_tenant_info",
+        "summary": "Invoke the get_tenant_info tool",
+        "description": "Invoke the get_tenant_info tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_available_scopes": {
+      "post": {
+        "operationId": "get_available_scopes",
+        "summary": "Invoke the get_available_scopes tool",
+        "description": "Invoke the get_available_scopes tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/search_catalog": {
+      "post": {
+        "operationId": "search_catalog",
+        "summary": "Invoke the search_catalog tool",
+        "description": "Invoke the search_catalog tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/search_repository": {
+      "post": {
+        "operationId": "search_repository",
+        "summary": "Invoke the search_repository tool",
+        "description": "Invoke the search_repository tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_catalog_metadata": {
+      "post": {
+        "operationId": "get_catalog_metadata",
+        "summary": "Invoke the get_catalog_metadata tool",
+        "description": "Invoke the get_catalog_metadata tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_consumption_metadata": {
+      "post": {
+        "operationId": "get_consumption_metadata",
+        "summary": "Invoke the get_consumption_metadata tool",
+        "description": "Invoke the get_consumption_metadata tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_analytical_metadata": {
+      "post": {
+        "operationId": "get_analytical_metadata",
+        "summary": "Invoke the get_analytical_metadata tool",
+        "description": "Invoke the get_analytical_metadata tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_relational_metadata": {
+      "post": {
+        "operationId": "get_relational_metadata",
+        "summary": "Invoke the get_relational_metadata tool",
+        "description": "Invoke the get_relational_metadata tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_asset_variables": {
+      "post": {
+        "operationId": "get_asset_variables",
+        "summary": "Invoke the get_asset_variables tool",
+        "description": "Invoke the get_asset_variables tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/list_relational_entities": {
+      "post": {
+        "operationId": "list_relational_entities",
+        "summary": "Invoke the list_relational_entities tool",
+        "description": "Invoke the list_relational_entities tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_relational_entity_metadata": {
+      "post": {
+        "operationId": "get_relational_entity_metadata",
+        "summary": "Invoke the get_relational_entity_metadata tool",
+        "description": "Invoke the get_relational_entity_metadata tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/query_relational_entity": {
+      "post": {
+        "operationId": "query_relational_entity",
+        "summary": "Invoke the query_relational_entity tool",
+        "description": "Invoke the query_relational_entity tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_relational_odata_service": {
+      "post": {
+        "operationId": "get_relational_odata_service",
+        "summary": "Invoke the get_relational_odata_service tool",
+        "description": "Invoke the get_relational_odata_service tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_repository_search_metadata": {
+      "post": {
+        "operationId": "get_repository_search_metadata",
+        "summary": "Invoke the get_repository_search_metadata tool",
+        "description": "Invoke the get_repository_search_metadata tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/list_analytical_datasets": {
+      "post": {
+        "operationId": "list_analytical_datasets",
+        "summary": "Invoke the list_analytical_datasets tool",
+        "description": "Invoke the list_analytical_datasets tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_analytical_model": {
+      "post": {
+        "operationId": "get_analytical_model",
+        "summary": "Invoke the get_analytical_model tool",
+        "description": "Invoke the get_analytical_model tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/query_analytical_data": {
+      "post": {
+        "operationId": "query_analytical_data",
+        "summary": "Invoke the query_analytical_data tool",
+        "description": "Invoke the query_analytical_data tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_analytical_service_document": {
+      "post": {
+        "operationId": "get_analytical_service_document",
+        "summary": "Invoke the get_analytical_service_document tool",
+        "description": "Invoke the get_analytical_service_document tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/list_repository_objects": {
+      "post": {
+        "operationId": "list_repository_objects",
+        "summary": "Invoke the list_repository_objects tool",
+        "description": "Invoke the list_repository_objects tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_object_definition": {
+      "post": {
+        "operationId": "get_object_definition",
+        "summary": "Invoke the get_object_definition tool",
+        "description": "Invoke the get_object_definition tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_deployed_objects": {
+      "post": {
+        "operationId": "get_deployed_objects",
+        "summary": "Invoke the get_deployed_objects tool",
+        "description": "Invoke the get_deployed_objects tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/test_phase67_endpoints": {
+      "post": {
+        "operationId": "test_phase67_endpoints",
+        "summary": "Invoke the test_phase67_endpoints tool",
+        "description": "Invoke the test_phase67_endpoints tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/test_phase8_endpoints": {
+      "post": {
+        "operationId": "test_phase8_endpoints",
+        "summary": "Invoke the test_phase8_endpoints tool",
+        "description": "Invoke the test_phase8_endpoints tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/test_analytical_endpoints": {
+      "post": {
+        "operationId": "test_analytical_endpoints",
+        "summary": "Invoke the test_analytical_endpoints tool",
+        "description": "Invoke the test_analytical_endpoints tool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/run_task_chain": {
+      "post": {
+        "operationId": "run_task_chain",
+        "summary": "Execute a task chain in SAP Datasphere and get a log ID for tracking",
+        "description": "Execute a task chain in SAP Datasphere and get a log ID for tracking.\n\n**Use this tool when:**\n- User asks to \"Run the ETL pipeline\" or \"Execute task chain X\"\n- Triggering scheduled data loads or transformations\n- Starting data replication or synchronization jobs\n- Automating data refresh workflows\n- Executing orchestrated data pipelines\n\n**What happens:**\n- Task chain execution is initiated immediately\n- Returns a logId to track the execution status\n- Task runs asynchronously (use get_task_log to check status)\n- All child tasks in the chain are executed in order\n\n**Required parameters:**\n- space_id: The space containing the task chain (e.g., 'SALES_SPACE')\n- object_id: The task chain name/ID (e.g., 'Daily_ETL_Pipeline')\n\n**What you'll get:**\n- logId: Unique identifier to track this execution\n- Use get_task_log(space_id, logId) to monitor progress\n- Use get_task_history(space_id, object_id) to see all runs\n\n**Example queries:**\n- \"Run the Daily_ETL_Pipeline in SALES_SPACE\"\n- \"Execute task chain Customer_Sync in FINANCE_SPACE\"\n- \"Trigger the data refresh pipeline in ANALYTICS\"\n- \"Start the nightly batch job in DWH_SPACE\"\n\n**Important notes:**\n- Task chains run asynchronously - tool returns immediately\n- Check status with get_task_log using the returned logId\n- Requires appropriate permissions to run task chains\n- Failed runs can be investigated with detailed logs\n\n**Workflow example:**\n1. Run task chain: run_task_chain(space_id='SALES', object_id='Daily_ETL')\n2. Get logId from response (e.g., 2295172)\n3. Check status: get_task_log(space_id='SALES', log_id=2295172)\n4. View details: get_task_log(space_id='SALES', log_id=2295172, detail_level='detailed')\n\n**Note:** Uses API: POST /api/v1/datasphere/tasks/chains/{space_id}/run/{object_id}\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "space_id": {
+                        "type": "string",
+                        "description": "The space ID containing the task chain (e.g., 'SALES_SPACE', 'FINANCE'). Must be uppercase."
+                      },
+                      "object_id": {
+                        "type": "string",
+                        "description": "The task chain name/identifier to execute (e.g., 'Daily_ETL_Pipeline', 'Customer_Sync')."
+                      }
+                    },
+                    "required": [
+                      "space_id",
+                      "object_id"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_task_log": {
+      "post": {
+        "operationId": "get_task_log",
+        "summary": "Get detailed information about a specific task execution in SAP Datasphere",
+        "description": "Get detailed information about a specific task execution in SAP Datasphere.\n\n**Use this tool when:**\n- Checking status of a running task (after run_task_chain)\n- Investigating why a task failed\n- Viewing detailed execution logs and messages\n- Monitoring task chain progress\n- Debugging data pipeline issues\n\n**What you'll get (depends on detail_level):**\n- **status** (default): Simple status object {\"status\": \"COMPLETED\"}\n- **status_only**: Just the status string \"COMPLETED\"\n- **detailed**: Full details including messages and child nodes\n- **extended**: Extended logs with complete message details\n\n**Required parameters:**\n- space_id: The space where the task ran\n- log_id: The log ID from run_task_chain or get_task_history\n\n**Optional parameters:**\n- detail_level: Amount of detail to return\n  - 'status' (default): Status object only\n  - 'status_only': Status string only\n  - 'detailed': Full logs with messages and children\n  - 'extended': Extended logs with message details\n\n**Status values:**\n- RUNNING: Task is currently executing\n- COMPLETED: Task finished successfully\n- FAILED: Task encountered an error\n- CANCELLED: Task was manually stopped\n\n**Example queries:**\n- \"Check status of task log 2295172 in SALES_SPACE\"\n- \"Get detailed logs for log ID 2295172\"\n- \"Show me why task 2326060 failed in FINANCE\"\n- \"Get extended execution details for log 2295172\"\n\n**Detailed response includes:**\n- logId, status, startTime, endTime, runTime\n- objectId (task chain name)\n- user who ran the task\n- children: Array of child task executions\n- messages: Array of log messages with severity and timestamps\n\n**Use cases:**\n- Monitor long-running ETL jobs\n- Debug failed data pipelines\n- Audit task execution history\n- Track data refresh timing\n- Investigate error messages\n\n**Note:** Uses API: GET /api/v1/datasphere/tasks/logs/{space_id}/{log_id}\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "space_id": {
+                        "type": "string",
+                        "description": "The space ID where the task ran (e.g., 'SALES_SPACE', 'FINANCE'). Must be uppercase."
+                      },
+                      "log_id": {
+                        "type": "integer",
+                        "description": "The log ID to retrieve details for (obtained from run_task_chain or get_task_history)."
+                      },
+                      "detail_level": {
+                        "type": "string",
+                        "enum": [
+                          "status",
+                          "status_only",
+                          "detailed",
+                          "extended"
+                        ],
+                        "description": "Level of detail to return. Options: 'status' (default), 'status_only', 'detailed', 'extended'.",
+                        "default": "status"
+                      }
+                    },
+                    "required": [
+                      "space_id",
+                      "log_id"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/tools/get_task_history": {
+      "post": {
+        "operationId": "get_task_history",
+        "summary": "Get the execution history for a specific task chain or object in SAP Datasphere",
+        "description": "Get the execution history for a specific task chain or object in SAP Datasphere.\n\n**Use this tool when:**\n- Viewing all previous runs of a task chain\n- Analyzing task execution patterns\n- Finding failed runs to investigate\n- Checking historical performance\n- Auditing task chain executions\n- Understanding run frequency and duration\n\n**What you'll get:**\n- Array of all historical task runs for the specified object\n- Each entry includes: logId, status, startTime, endTime, runTime\n- Sorted by most recent first\n- Shows RUNNING, COMPLETED, FAILED, CANCELLED runs\n\n**Required parameters:**\n- space_id: The space containing the task chain\n- object_id: The task chain name to get history for\n\n**Response includes for each run:**\n- logId: Unique identifier for this execution\n- status: RUNNING, COMPLETED, FAILED, or CANCELLED\n- startTime: When the task started (ISO format)\n- endTime: When the task finished (if completed)\n- runTime: Duration in milliseconds\n- objectId: The task chain name\n- applicationId: Always 'TASK_CHAINS' for task chains\n- activity: The activity type (e.g., 'RUN_CHAIN')\n- user: Who initiated the run\n\n**Example queries:**\n- \"Show me the run history for Daily_ETL_Pipeline in SALES_SPACE\"\n- \"List all executions of Customer_Sync in FINANCE\"\n- \"Get historical runs for Nested_Chain_1 in DWH_SPACE\"\n- \"How many times has Data_Refresh run this week?\"\n\n**Use cases:**\n- Identify recurring failures\n- Analyze execution duration trends\n- Find specific failed runs to debug\n- Audit who ran tasks and when\n- Plan maintenance windows\n- Monitor SLA compliance\n\n**Workflow example:**\n1. Get history: get_task_history(space_id='SALES', object_id='Daily_ETL')\n2. Find failed run: Look for status='FAILED', note logId\n3. Get details: get_task_log(space_id='SALES', log_id=<failed_logId>, detail_level='detailed')\n4. View error messages in the response\n\n**Note:** Uses API: GET /api/v1/datasphere/tasks/logs/{space_id}/objects/{object_id}\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "space_id": {
+                        "type": "string",
+                        "description": "The space ID containing the task chain (e.g., 'SALES_SPACE', 'FINANCE'). Must be uppercase."
+                      },
+                      "object_id": {
+                        "type": "string",
+                        "description": "The task chain name/identifier to get history for (e.g., 'Daily_ETL_Pipeline', 'Customer_Sync')."
+                      }
+                    },
+                    "required": [
+                      "space_id",
+                      "object_id"
+                    ]
+                  }
+                },
+                "required": [
+                  "arguments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "description": "Tool output (string or structured JSON)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  }
+}

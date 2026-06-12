@@ -8193,7 +8193,14 @@ async def _run_stdio():
 
 
 async def _run_http(host: str, port: int, path: str, auth_token: Optional[str]):
-    """Run server over Streamable HTTP (MCP 2025-03-26 transport)."""
+    """Run server over Streamable HTTP (MCP 2025-03-26 transport).
+
+    Exposes three protocol layers on the same port:
+      {path}          — MCP Streamable HTTP for Claude Client
+      /api/tools/*    — REST API for Gemini Enterprise & M365 Copilot Studio
+      /openapi.json   — OpenAPI 3.0 spec auto-generated from live tool list
+      /health         — liveness probe (unauthenticated)
+    """
     import contextlib
     try:
         from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
@@ -8203,12 +8210,13 @@ async def _run_http(host: str, port: int, path: str, auth_token: Optional[str]):
             "Install with: pip install 'mcp>=1.2.0'"
         ) from e
     from starlette.applications import Starlette
-    from starlette.routing import Mount
+    from starlette.routing import Mount, Route
     from starlette.responses import JSONResponse
     from starlette.middleware import Middleware
     from starlette.middleware.base import BaseHTTPMiddleware
     import uvicorn
 
+    # ── MCP Streamable HTTP session manager ──────────────────────────────
     session_manager = StreamableHTTPSessionManager(
         app=server,
         event_store=None,
@@ -8219,35 +8227,78 @@ async def _run_http(host: str, port: int, path: str, auth_token: Optional[str]):
     async def handle_mcp(scope, receive, send):
         await session_manager.handle_request(scope, receive, send)
 
+    # ── Bearer auth middleware (shared by MCP + REST layers) ─────────────
     class BearerAuthMiddleware(BaseHTTPMiddleware):
         def __init__(self, app, token: str):
             super().__init__(app)
             self._token = token
 
         async def dispatch(self, request, call_next):
-            if request.url.path.startswith("/health"):
+            # Health and OpenAPI spec are always public
+            if request.url.path in ("/health", "/openapi.json"):
                 return await call_next(request)
             header = request.headers.get("authorization", "")
             if not header.startswith("Bearer ") or header[7:] != self._token:
                 return JSONResponse({"error": "unauthorized"}, status_code=401)
             return await call_next(request)
 
+    # ── REST API layer (M365 Copilot Studio / Gemini Enterprise) ─────────
+    # Build a call_tool wrapper that matches the REST layer's signature
+    async def _rest_call_tool(tool_name: str, arguments: dict):
+        """Invoke an MCP tool handler directly (bypasses MCP transport)."""
+        from mcp.types import CallToolResult
+        # Use the server's registered call_tool handler
+        result = await server._call_tool_handler(tool_name, arguments)  # type: ignore[attr-defined]
+        return result
+
+    async def _rest_list_tools():
+        """Return the registered tool list."""
+        result = await server._list_tools_handler()  # type: ignore[attr-defined]
+        return result
+
+    public_base_url = os.getenv("MCP_PUBLIC_URL", f"http://{host}:{port}")
+
+    try:
+        from rest_api_layer import build_rest_app
+        rest_app = build_rest_app(
+            call_tool_fn=_rest_call_tool,
+            list_tools_fn=_rest_list_tools,
+            auth_token=auth_token,
+            public_base_url=public_base_url,
+        )
+        logger.info("✅ REST API layer loaded (M365 Copilot / Gemini)")
+        rest_available = True
+    except Exception as exc:
+        logger.warning(f"⚠️  REST API layer unavailable: {exc}")
+        rest_available = False
+
+    # ── Lifespan ─────────────────────────────────────────────────────────
     @contextlib.asynccontextmanager
     async def lifespan(app):
         async with session_manager.run():
-            logger.info(f"✅ Streamable HTTP MCP server listening on http://{host}:{port}{path}")
+            logger.info(f"✅ MCP Streamable HTTP  → http://{host}:{port}{path}")
+            if rest_available:
+                logger.info(f"✅ REST API             → http://{host}:{port}/api/tools/{{tool}}")
+                logger.info(f"✅ OpenAPI spec         → http://{host}:{port}/openapi.json")
+            logger.info(f"✅ Health probe         → http://{host}:{port}/health")
             yield
 
+    # ── Assemble routes ───────────────────────────────────────────────────
     async def health(request):
-        return JSONResponse({"status": "ok", "transport": "streamable-http"})
+        return JSONResponse({
+            "status": "ok",
+            "transport": "streamable-http",
+            "rest_api": rest_available,
+        })
 
-    from starlette.routing import Route
+    routes = [Route("/health", endpoint=health)]
+    if rest_available:
+        routes.append(Mount("/", app=rest_app))
+    routes.append(Mount(path, app=handle_mcp))
+
     middleware = [Middleware(BearerAuthMiddleware, token=auth_token)] if auth_token else []
     app = Starlette(
-        routes=[
-            Route("/health", endpoint=health),
-            Mount(path, app=handle_mcp),
-        ],
+        routes=routes,
         middleware=middleware,
         lifespan=lifespan,
     )

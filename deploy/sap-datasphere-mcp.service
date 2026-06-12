@@ -1,0 +1,42 @@
+[Unit]
+Description=SAP Datasphere MCP Server
+Documentation=https://github.com/age-saran/sap-datasphere-mcp
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mcpuser
+Group=mcpuser
+WorkingDirectory=/opt/sap-datasphere-mcp
+
+# Load .env file (EnvironmentFile= passes KEY=VAL to the process)
+EnvironmentFile=/opt/sap-datasphere-mcp/.env
+
+# Start the server in HTTP mode, bound to all interfaces on port 8080
+# cloudflared sits in front — no need to expose 8080 publicly
+ExecStart=/opt/sap-datasphere-mcp/venv/bin/python \
+    /opt/sap-datasphere-mcp/sap_datasphere_mcp_server.py \
+    --transport http \
+    --host 0.0.0.0 \
+    --port 8080 \
+    --path /mcp
+
+# Restart on failure (not on clean exit)
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/sap-datasphere-mcp
+
+# Logging — goes to journald (use: journalctl -u sap-datasphere-mcp -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sap-datasphere-mcp
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,24 @@
+[Unit]
+Description=Cloudflare Tunnel — SAP Datasphere MCP
+Documentation=https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
+After=network.target network-online.target sap-datasphere-mcp.service
+Wants=network-online.target
+# Start cloudflared only after MCP server is up
+Requires=sap-datasphere-mcp.service
+
+[Service]
+Type=simple
+User=root
+# Reads tunnel token/config from /etc/cloudflared/config.yml
+ExecStart=/usr/bin/cloudflared tunnel --config /etc/cloudflared/config.yml run
+
+Restart=on-failure
+RestartSec=10s
+TimeoutStopSec=30s
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cloudflared
+
+[Install]
+WantedBy=multi-user.target
