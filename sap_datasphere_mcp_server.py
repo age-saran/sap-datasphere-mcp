@@ -419,31 +419,39 @@ async def handle_list_tools() -> list[Tool]:
             description=enhanced["smart_query"]["description"],
             inputSchema=enhanced["smart_query"]["inputSchema"]
         ),
-        Tool(
-            name="list_database_users",
-            description=enhanced["list_database_users"]["description"],
-            inputSchema=enhanced["list_database_users"]["inputSchema"]
-        ),
-        Tool(
-            name="create_database_user",
-            description=enhanced["create_database_user"]["description"],
-            inputSchema=enhanced["create_database_user"]["inputSchema"]
-        ),
-        Tool(
-            name="reset_database_user_password",
-            description=enhanced["reset_database_user_password"]["description"],
-            inputSchema=enhanced["reset_database_user_password"]["inputSchema"]
-        ),
-        Tool(
-            name="update_database_user",
-            description=enhanced["update_database_user"]["description"],
-            inputSchema=enhanced["update_database_user"]["inputSchema"]
-        ),
-        Tool(
-            name="delete_database_user",
-            description=enhanced["delete_database_user"]["description"],
-            inputSchema=enhanced["delete_database_user"]["inputSchema"]
-        ),
+        # ============================================================
+        # DATABASE USER MANAGEMENT TOOLS — COMMENTED OUT (DISABLED)
+        # เหตุผล: ปิดการใช้งานชั่วคราว ห้ามลบ code ส่วนนี้ออก
+        # หากต้องการเปิดใช้งานอีกครั้ง ให้ uncomment block ด้านล่าง
+        # ============================================================
+        # Tool(
+        #     name="list_database_users",
+        #     description=enhanced["list_database_users"]["description"],
+        #     inputSchema=enhanced["list_database_users"]["inputSchema"]
+        # ),
+        # Tool(
+        #     name="create_database_user",
+        #     description=enhanced["create_database_user"]["description"],
+        #     inputSchema=enhanced["create_database_user"]["inputSchema"]
+        # ),
+        # Tool(
+        #     name="reset_database_user_password",
+        #     description=enhanced["reset_database_user_password"]["description"],
+        #     inputSchema=enhanced["reset_database_user_password"]["inputSchema"]
+        # ),
+        # Tool(
+        #     name="update_database_user",
+        #     description=enhanced["update_database_user"]["description"],
+        #     inputSchema=enhanced["update_database_user"]["inputSchema"]
+        # ),
+        # Tool(
+        #     name="delete_database_user",
+        #     description=enhanced["delete_database_user"]["description"],
+        #     inputSchema=enhanced["delete_database_user"]["inputSchema"]
+        # ),
+        # ============================================================
+        # END DATABASE USER MANAGEMENT TOOLS
+        # ============================================================
         Tool(
             name="list_catalog_assets",
             description=enhanced["list_catalog_assets"]["description"],
@@ -2941,741 +2949,754 @@ async def _execute_tool(name: str, arguments: dict) -> list[types.TextContent]:
                      f"Mode: {mode}"
             )]
 
-    elif name == "list_database_users":
-        space_id = arguments["space_id"]
-        output_file = arguments.get("output_file")
 
-        if DATASPHERE_CONFIG["use_mock_data"]:
-            # Mock mode
-            users = MOCK_DATA["database_users"].get(space_id, [])
-
-            if not users:
-                return [types.TextContent(
-                    type="text",
-                    text=f"No database users found in space '{space_id}'.\n\n"
-                         f"This could mean:\n"
-                         f"- The space exists but has no database users configured\n"
-                         f"- The space ID might be incorrect\n\n"
-                         f"Use list_spaces to see available spaces.\n\n"
-                         f"Note: This is mock data. Set USE_MOCK_DATA=false for real database users."
-                )]
-
-            result = {
-                "space_id": space_id,
-                "user_count": len(users),
-                "users": users
-            }
-
-            if output_file:
-                result["note"] = f"In production, output would be saved to {output_file}"
-
-            return [types.TextContent(
-                type="text",
-                text=f"Database Users in '{space_id}':\n\n" +
-                     json.dumps(result, indent=2) +
-                     f"\n\nNote: This is mock data. Set USE_MOCK_DATA=false for real database users."
-            )]
-        else:
-            # Real CLI execution
-            try:
-                import subprocess
-
-                logger.info(f"Executing CLI: datasphere dbusers list --space {space_id}")
-
-                # Execute datasphere CLI command
-                result = subprocess.run(
-                    ["datasphere", "dbusers", "list", "--space", space_id],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                    timeout=30
-                )
-
-                # Parse CLI output (assuming JSON format)
-                cli_output = result.stdout.strip()
-
-                if not cli_output:
-                    return [types.TextContent(
-                        type="text",
-                        text=f"No database users found in space '{space_id}'.\n\n"
-                             f"This could mean:\n"
-                             f"- The space exists but has no database users configured\n"
-                             f"- The space ID might be incorrect\n\n"
-                             f"Use list_spaces to see available spaces."
-                    )]
-
-                # Try to parse as JSON
-                try:
-                    users_data = json.loads(cli_output)
-                except json.JSONDecodeError:
-                    # If not JSON, return raw output
-                    users_data = {"raw_output": cli_output}
-
-                response = {
-                    "space_id": space_id,
-                    "users": users_data,
-                    "source": "SAP Datasphere CLI"
-                }
-
-                if output_file:
-                    response["output_file"] = output_file
-                    response["note"] = f"To save output, redirect: datasphere dbusers list --space {space_id} > {output_file}"
-
-                return [types.TextContent(
-                    type="text",
-                    text=f"Database Users in '{space_id}':\n\n" +
-                         json.dumps(response, indent=2)
-                )]
-
-            except subprocess.CalledProcessError as e:
-                logger.error(f"CLI command failed: {e.stderr}")
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error listing database users: {e.stderr}\n\n"
-                         f"Command: datasphere dbusers list --space {space_id}\n"
-                         f"Exit code: {e.returncode}\n\n"
-                         f"Troubleshooting:\n"
-                         f"1. Ensure datasphere CLI is installed and in PATH\n"
-                         f"2. Verify CLI is authenticated (run: datasphere login)\n"
-                         f"3. Check space ID is correct (run: datasphere spaces list)\n"
-                         f"4. Verify permissions to list database users"
-                )]
-            except FileNotFoundError:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: datasphere CLI not found.\n\n"
-                         f"Please install the SAP Datasphere CLI:\n"
-                         f"1. Download from: https://help.sap.com/docs/SAP_DATASPHERE\n"
-                         f"2. Ensure it's in your system PATH\n"
-                         f"3. Authenticate with: datasphere login"
-                )]
-            except subprocess.TimeoutExpired:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: CLI command timed out after 30 seconds.\n\n"
-                         f"The space may have many users, or the CLI is unresponsive."
-                )]
-            except Exception as e:
-                logger.error(f"Unexpected error listing database users: {e}")
-                return [types.TextContent(
-                    type="text",
-                    text=f"Unexpected error listing database users: {str(e)}"
-                )]
-
-    elif name == "create_database_user":
-        space_id = arguments["space_id"]
-        database_user_id = arguments["database_user_id"]
-        user_definition = arguments["user_definition"]
-        output_file = arguments.get("output_file")
-
-        if DATASPHERE_CONFIG["use_mock_data"]:
-            # Mock mode
-            password = secrets.token_urlsafe(16)
-            full_username = f"{space_id}#{database_user_id}"
-
-            result = {
-                "status": "SUCCESS",
-                "message": f"Database user '{database_user_id}' created successfully in space '{space_id}'",
-                "user": {
-                    "user_id": database_user_id,
-                    "full_name": full_username,
-                    "status": "ACTIVE",
-                    "created_date": datetime.utcnow().isoformat() + "Z",
-                    "credentials": {
-                        "username": full_username,
-                        "password": password,
-                        "note": "IMPORTANT: Save this password securely! It will not be shown again."
-                    },
-                    "permissions": user_definition
-                },
-                "next_steps": [
-                    "Save the credentials securely (use output_file parameter recommended)",
-                    "Communicate password to user via secure channel (not email!)",
-                    "User must change password on first login",
-                    "Test connection with the provided credentials"
-                ]
-            }
-
-            if output_file:
-                result["output_file"] = output_file
-                result["note"] = f"In production, credentials would be saved to {output_file}"
-
-            return [types.TextContent(
-                type="text",
-                text=f"Database User Created:\n\n" +
-                     json.dumps(result, indent=2) +
-                     f"\n\n⚠️  WARNING: This is mock data. Set USE_MOCK_DATA=false for real user creation."
-            )]
-        else:
-            # Real CLI execution
-            try:
-                import subprocess
-                import tempfile
-                import os
-
-                logger.info(f"Creating database user {database_user_id} in space {space_id}")
-
-                # Write user definition to temporary JSON file
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
-                    json.dump(user_definition, temp_file, indent=2)
-                    temp_file_path = temp_file.name
-
-                try:
-                    # Execute datasphere CLI command
-                    cmd = [
-                        "datasphere", "dbusers", "create",
-                        "--space", space_id,
-                        "--databaseuser", database_user_id,
-                        "--file-path", temp_file_path
-                    ]
-
-                    logger.info(f"Executing CLI: {' '.join(cmd)}")
-
-                    result_proc = subprocess.run(
-                        cmd,
-                        capture_output=True,
-                        text=True,
-                        check=True,
-                        timeout=60
-                    )
-
-                    cli_output = result_proc.stdout.strip()
-
-                    # Try to parse CLI output
-                    try:
-                        result_data = json.loads(cli_output)
-                    except json.JSONDecodeError:
-                        result_data = {"raw_output": cli_output}
-
-                    response = {
-                        "status": "SUCCESS",
-                        "message": f"Database user '{database_user_id}' created successfully",
-                        "space_id": space_id,
-                        "database_user_id": database_user_id,
-                        "cli_output": result_data,
-                        "source": "SAP Datasphere CLI"
-                    }
-
-                    if output_file:
-                        response["output_file"] = output_file
-                        response["note"] = f"To save credentials, use CLI output redirection"
-
-                    return [types.TextContent(
-                        type="text",
-                        text=f"Database User Created:\n\n" +
-                             json.dumps(response, indent=2)
-                    )]
-
-                finally:
-                    # Clean up temporary file
-                    if os.path.exists(temp_file_path):
-                        os.unlink(temp_file_path)
-
-            except subprocess.CalledProcessError as e:
-                logger.error(f"CLI command failed: {e.stderr}")
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error creating database user: {e.stderr}\n\n"
-                         f"Command failed with exit code: {e.returncode}\n\n"
-                         f"Troubleshooting:\n"
-                         f"1. Verify user_definition format matches SAP requirements\n"
-                         f"2. Check permissions to create database users\n"
-                         f"3. Ensure user doesn't already exist\n"
-                         f"4. Verify space ID is correct"
-                )]
-            except FileNotFoundError:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: datasphere CLI not found. Please install and configure the CLI."
-                )]
-            except subprocess.TimeoutExpired:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: CLI command timed out after 60 seconds."
-                )]
-            except Exception as e:
-                logger.error(f"Unexpected error creating database user: {e}")
-                return [types.TextContent(
-                    type="text",
-                    text=f"Unexpected error: {str(e)}"
-                )]
-
-    elif name == "reset_database_user_password":
-        space_id = arguments["space_id"]
-        database_user_id = arguments["database_user_id"]
-        output_file = arguments.get("output_file")
-
-        if DATASPHERE_CONFIG["use_mock_data"]:
-            # Mock mode
-            users = MOCK_DATA["database_users"].get(space_id, [])
-            user = next((u for u in users if u["user_id"] == database_user_id), None)
-
-            if not user:
-                return [types.TextContent(
-                    type="text",
-                    text=f">>> User Not Found <<<\n\n"
-                         f"Database user '{database_user_id}' does not exist in space '{space_id}'.\n\n"
-                         f"Available users in {space_id}:\n" +
-                         "\n".join(f"- {u['user_id']}" for u in users) if users else "No users found." +
-                         f"\n\nNote: This is mock data. Set USE_MOCK_DATA=false for real password reset."
-                )]
-
-            new_password = secrets.token_urlsafe(16)
-            full_username = f"{space_id}#{database_user_id}"
-
-            result = {
-                "status": "SUCCESS",
-                "message": f"Password reset successfully for user '{database_user_id}' in space '{space_id}'",
-                "user": {
-                    "user_id": database_user_id,
-                    "full_name": full_username,
-                    "credentials": {
-                        "username": full_username,
-                        "new_password": new_password,
-                        "note": "IMPORTANT: Save this password securely! It will not be shown again."
-                    },
-                    "reset_date": datetime.utcnow().isoformat() + "Z"
-                },
-                "security_actions": [
-                    "Old password invalidated immediately",
-                    "All active sessions terminated",
-                    "Password must be changed on next login",
-                    "Action logged for security audit"
-                ],
-                "next_steps": [
-                    "Save new credentials securely (use output_file parameter recommended)",
-                    "Communicate new password via secure channel (not email!)",
-                    "Verify user identity before sharing password",
-                    "Document password reset in change log"
-                ]
-            }
-
-            if output_file:
-                result["output_file"] = output_file
-                result["note"] = f"In production, credentials would be saved to {output_file}"
-
-            return [types.TextContent(
-                type="text",
-                text=f"Password Reset Complete:\n\n" +
-                     json.dumps(result, indent=2) +
-                     f"\n\n⚠️  WARNING: This is mock data. Set USE_MOCK_DATA=false for real password reset."
-            )]
-        else:
-            # Real CLI execution
-            try:
-                import subprocess
-
-                logger.info(f"Resetting password for database user {database_user_id} in space {space_id}")
-
-                # Execute datasphere CLI command
-                cmd = [
-                    "datasphere", "dbusers", "password", "reset",
-                    "--space", space_id,
-                    "--databaseuser", database_user_id
-                ]
-
-                logger.info(f"Executing CLI: {' '.join(cmd)}")
-
-                result_proc = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                    timeout=60
-                )
-
-                cli_output = result_proc.stdout.strip()
-
-                # Try to parse CLI output
-                try:
-                    result_data = json.loads(cli_output)
-                except json.JSONDecodeError:
-                    result_data = {"raw_output": cli_output}
-
-                response = {
-                    "status": "SUCCESS",
-                    "message": f"Password reset successfully for user '{database_user_id}'",
-                    "space_id": space_id,
-                    "database_user_id": database_user_id,
-                    "cli_output": result_data,
-                    "source": "SAP Datasphere CLI",
-                    "security_note": "New password provided in CLI output - save securely!"
-                }
-
-                if output_file:
-                    response["output_file"] = output_file
-
-                return [types.TextContent(
-                    type="text",
-                    text=f"Password Reset Complete:\n\n" +
-                         json.dumps(response, indent=2)
-                )]
-
-            except subprocess.CalledProcessError as e:
-                logger.error(f"CLI command failed: {e.stderr}")
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error resetting password: {e.stderr}\n\n"
-                         f"Command failed with exit code: {e.returncode}\n\n"
-                         f"Troubleshooting:\n"
-                         f"1. Verify user exists (use list_database_users)\n"
-                         f"2. Check permissions to reset passwords\n"
-                         f"3. Ensure CLI is authenticated"
-                )]
-            except FileNotFoundError:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: datasphere CLI not found. Please install and configure the CLI."
-                )]
-            except subprocess.TimeoutExpired:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: CLI command timed out after 60 seconds."
-                )]
-            except Exception as e:
-                logger.error(f"Unexpected error resetting password: {e}")
-                return [types.TextContent(
-                    type="text",
-                    text=f"Unexpected error: {str(e)}"
-                )]
-
-    elif name == "update_database_user":
-        space_id = arguments["space_id"]
-        database_user_id = arguments["database_user_id"]
-        updated_definition = arguments["updated_definition"]
-        output_file = arguments.get("output_file")
-
-        if DATASPHERE_CONFIG["use_mock_data"]:
-            # Mock mode
-            users = MOCK_DATA["database_users"].get(space_id, [])
-            user = next((u for u in users if u["user_id"] == database_user_id), None)
-
-            if not user:
-                return [types.TextContent(
-                    type="text",
-                    text=f">>> User Not Found <<<\n\n"
-                         f"Database user '{database_user_id}' does not exist in space '{space_id}'.\n\n"
-                         f"Available users in {space_id}:\n" +
-                         "\n".join(f"- {u['user_id']}" for u in users) if users else "No users found." +
-                         f"\n\nNote: This is mock data. Set USE_MOCK_DATA=false for real user update."
-                )]
-
-            # Compare old and new permissions
-            old_permissions = user.get("permissions", {})
-
-            result = {
-                "status": "SUCCESS",
-                "message": f"Database user '{database_user_id}' updated successfully in space '{space_id}'",
-                "user": {
-                    "user_id": database_user_id,
-                    "full_name": f"{space_id}#{database_user_id}",
-                    "updated_date": datetime.utcnow().isoformat() + "Z",
-                    "old_permissions": old_permissions,
-                    "new_permissions": updated_definition
-                },
-                "changes_applied": [
-                    "Permissions updated immediately",
-                    "All changes logged for audit",
-                    "Active sessions may need reconnection"
-                ],
-                "next_steps": [
-                    "Verify new permissions are correct",
-                    "Test user access with new configuration",
-                    "Notify user if access levels changed",
-                    "Document changes in change log"
-                ]
-            }
-
-            if output_file:
-                result["output_file"] = output_file
-                result["note"] = f"In production, updated configuration would be saved to {output_file}"
-
-            return [types.TextContent(
-                type="text",
-                text=f"Database User Updated:\n\n" +
-                     json.dumps(result, indent=2) +
-                     f"\n\n⚠️  WARNING: This is mock data. Set USE_MOCK_DATA=false for real user update."
-            )]
-        else:
-            # Real CLI execution
-            try:
-                import subprocess
-                import tempfile
-                import os
-
-                logger.info(f"Updating database user {database_user_id} in space {space_id}")
-
-                # Write updated definition to temporary JSON file
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
-                    json.dump(updated_definition, temp_file, indent=2)
-                    temp_file_path = temp_file.name
-
-                try:
-                    # Execute datasphere CLI command
-                    cmd = [
-                        "datasphere", "dbusers", "update",
-                        "--space", space_id,
-                        "--databaseuser", database_user_id,
-                        "--file-path", temp_file_path
-                    ]
-
-                    logger.info(f"Executing CLI: {' '.join(cmd)}")
-
-                    result_proc = subprocess.run(
-                        cmd,
-                        capture_output=True,
-                        text=True,
-                        check=True,
-                        timeout=60
-                    )
-
-                    cli_output = result_proc.stdout.strip()
-
-                    # Try to parse CLI output
-                    try:
-                        result_data = json.loads(cli_output)
-                    except json.JSONDecodeError:
-                        result_data = {"raw_output": cli_output}
-
-                    response = {
-                        "status": "SUCCESS",
-                        "message": f"Database user '{database_user_id}' updated successfully",
-                        "space_id": space_id,
-                        "database_user_id": database_user_id,
-                        "updated_definition": updated_definition,
-                        "cli_output": result_data,
-                        "source": "SAP Datasphere CLI"
-                    }
-
-                    if output_file:
-                        response["output_file"] = output_file
-
-                    return [types.TextContent(
-                        type="text",
-                        text=f"Database User Updated:\n\n" +
-                             json.dumps(response, indent=2)
-                    )]
-
-                finally:
-                    # Clean up temporary file
-                    if os.path.exists(temp_file_path):
-                        os.unlink(temp_file_path)
-
-            except subprocess.CalledProcessError as e:
-                logger.error(f"CLI command failed: {e.stderr}")
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error updating user: {e.stderr}\n\n"
-                         f"Command failed with exit code: {e.returncode}\n\n"
-                         f"Troubleshooting:\n"
-                         f"1. Verify user exists (use list_database_users)\n"
-                         f"2. Check updated_definition JSON format is correct\n"
-                         f"3. Ensure you have permissions to update users\n"
-                         f"4. Verify datasphere CLI is configured correctly"
-                )]
-
-            except FileNotFoundError:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: SAP Datasphere CLI not found.\n\n"
-                         f"Please install the datasphere CLI:\n"
-                         f"https://help.sap.com/docs/SAP_DATASPHERE/cli"
-                )]
-
-            except subprocess.TimeoutExpired:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: User update timed out after 60 seconds.\n\n"
-                         f"This may indicate a slow network or server issue."
-                )]
-
-            except Exception as e:
-                logger.error(f"Unexpected error updating user: {e}")
-                return [types.TextContent(
-                    type="text",
-                    text=f"Unexpected error: {str(e)}"
-                )]
-
-    elif name == "delete_database_user":
-        space_id = arguments["space_id"]
-        database_user_id = arguments["database_user_id"]
-        force = arguments.get("force", False)
-
-        if DATASPHERE_CONFIG["use_mock_data"]:
-            # Mock mode
-            users = MOCK_DATA["database_users"].get(space_id, [])
-            user = next((u for u in users if u["user_id"] == database_user_id), None)
-
-            if not user:
-                return [types.TextContent(
-                    type="text",
-                    text=f">>> User Not Found <<<\n\n"
-                         f"Database user '{database_user_id}' does not exist in space '{space_id}'.\n\n"
-                         f"Available users in {space_id}:\n" +
-                         "\n".join(f"- {u['user_id']}" for u in users) if users else "No users found." +
-                         f"\n\nNote: This is mock data. Set USE_MOCK_DATA=false for real user deletion."
-                )]
-
-            # If not forced, require explicit confirmation
-            if not force:
-                return [types.TextContent(
-                    type="text",
-                    text=f">>> Confirmation Required <<<\n\n"
-                         f"⚠️  WARNING: You are about to PERMANENTLY DELETE database user '{database_user_id}'.\n\n"
-                         f"User Details:\n"
-                         f"- Full Name: {user.get('full_name')}\n"
-                         f"- Status: {user.get('status')}\n"
-                         f"- Created: {user.get('created_date')}\n"
-                         f"- Last Login: {user.get('last_login')}\n"
-                         f"- Description: {user.get('description')}\n\n"
-                         f"Consequences:\n"
-                         f"- User account permanently deleted (IRREVERSIBLE)\n"
-                         f"- All active sessions terminated immediately\n"
-                         f"- All granted privileges revoked\n"
-                         f"- Cannot be recovered - must recreate if needed\n\n"
-                         f"Before Proceeding:\n"
-                         f"1. Verify no applications depend on this user\n"
-                         f"2. Check if user owns any database objects\n"
-                         f"3. Get management approval for production users\n"
-                         f"4. Document deletion reason\n\n"
-                         f"To confirm deletion, call this tool again with 'force': true\n\n"
-                         f"Note: This is mock data. Set USE_MOCK_DATA=false for real user deletion."
-                )]
-
-            # Deletion confirmed
-            result = {
-                "status": "SUCCESS",
-                "message": f"Database user '{database_user_id}' deleted successfully from space '{space_id}'",
-                "deleted_user": {
-                    "user_id": database_user_id,
-                    "full_name": f"{space_id}#{database_user_id}",
-                    "deleted_date": datetime.utcnow().isoformat() + "Z",
-                    "previous_status": user.get("status"),
-                    "created_date": user.get("created_date"),
-                    "description": user.get("description")
-                },
-                "actions_taken": [
-                    "User account permanently deleted",
-                    "All active sessions terminated",
-                    "All privileges revoked",
-                    "Deletion logged for audit"
-                ],
-                "reminder": "This action is IRREVERSIBLE. The user must be recreated if needed again."
-            }
-
-            return [types.TextContent(
-                type="text",
-                text=f"Database User Deleted:\n\n" +
-                     json.dumps(result, indent=2) +
-                     f"\n\n⚠️  WARNING: This is mock data. Set USE_MOCK_DATA=false for real user deletion."
-            )]
-        else:
-            # Real CLI execution
-            try:
-                import subprocess
-
-                logger.info(f"Deleting database user {database_user_id} in space {space_id} (force={force})")
-
-                # Build CLI command
-                cmd = [
-                    "datasphere", "dbusers", "delete",
-                    "--space", space_id,
-                    "--databaseuser", database_user_id
-                ]
-
-                # Add --force flag if confirmed
-                if force:
-                    cmd.append("--force")
-
-                logger.info(f"Executing CLI: {' '.join(cmd)}")
-
-                result_proc = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                    timeout=60
-                )
-
-                cli_output = result_proc.stdout.strip()
-
-                # Try to parse CLI output
-                try:
-                    result_data = json.loads(cli_output)
-                except json.JSONDecodeError:
-                    result_data = {"raw_output": cli_output}
-
-                response = {
-                    "status": "SUCCESS",
-                    "message": f"Database user '{database_user_id}' deleted successfully",
-                    "space_id": space_id,
-                    "database_user_id": database_user_id,
-                    "force": force,
-                    "cli_output": result_data,
-                    "source": "SAP Datasphere CLI",
-                    "reminder": "This action is IRREVERSIBLE. User must be recreated if needed again."
-                }
-
-                return [types.TextContent(
-                    type="text",
-                    text=f"Database User Deleted:\n\n" +
-                         json.dumps(response, indent=2)
-                )]
-
-            except subprocess.CalledProcessError as e:
-                logger.error(f"CLI command failed: {e.stderr}")
-
-                # Check if error is confirmation required
-                if "confirmation" in e.stderr.lower() or "force" in e.stderr.lower():
-                    return [types.TextContent(
-                        type="text",
-                        text=f">>> Confirmation Required <<<\n\n"
-                             f"⚠️  WARNING: You are about to PERMANENTLY DELETE database user '{database_user_id}'.\n\n"
-                             f"Consequences:\n"
-                             f"- User account permanently deleted (IRREVERSIBLE)\n"
-                             f"- All active sessions terminated immediately\n"
-                             f"- All granted privileges revoked\n"
-                             f"- Cannot be recovered - must recreate if needed\n\n"
-                             f"Before Proceeding:\n"
-                             f"1. Verify no applications depend on this user\n"
-                             f"2. Check if user owns any database objects\n"
-                             f"3. Get management approval for production users\n"
-                             f"4. Document deletion reason\n\n"
-                             f"To confirm deletion, call this tool again with 'force': true"
-                    )]
-
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error deleting user: {e.stderr}\n\n"
-                         f"Command failed with exit code: {e.returncode}\n\n"
-                         f"Troubleshooting:\n"
-                         f"1. Verify user exists (use list_database_users)\n"
-                         f"2. If deletion requires confirmation, add 'force': true\n"
-                         f"3. Check you have permissions to delete users\n"
-                         f"4. Verify datasphere CLI is configured correctly"
-                )]
-
-            except FileNotFoundError:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: SAP Datasphere CLI not found.\n\n"
-                         f"Please install the datasphere CLI:\n"
-                         f"https://help.sap.com/docs/SAP_DATASPHERE/cli"
-                )]
-
-            except subprocess.TimeoutExpired:
-                return [types.TextContent(
-                    type="text",
-                    text=f"Error: User deletion timed out after 60 seconds.\n\n"
-                         f"This may indicate a slow network or server issue."
-                )]
-
-            except Exception as e:
-                logger.error(f"Unexpected error deleting user: {e}")
-                return [types.TextContent(
-                    type="text",
-                    text=f"Unexpected error: {str(e)}"
-                )]
+    # ============================================================
+    # DATABASE USER MANAGEMENT HANDLERS — COMMENTED OUT (DISABLED)
+    # เหตุผล: ปิดการใช้งานชั่วคราว ห้ามลบ code ส่วนนี้ออก
+    # หากต้องการเปิดใช้งานอีกครั้ง ให้ uncomment block ด้านล่าง
+    # ครอบคลุม tools: list_database_users, create_database_user,
+    #                 reset_database_user_password, update_database_user,
+    #                 delete_database_user
+    # ============================================================
+    # elif name == "list_database_users":
+    # space_id = arguments["space_id"]
+    # output_file = arguments.get("output_file")
+    #
+    # if DATASPHERE_CONFIG["use_mock_data"]:
+    # # Mock mode
+    # users = MOCK_DATA["database_users"].get(space_id, [])
+    #
+    # if not users:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"No database users found in space '{space_id}'.\n\n"
+    # f"This could mean:\n"
+    # f"- The space exists but has no database users configured\n"
+    # f"- The space ID might be incorrect\n\n"
+    # f"Use list_spaces to see available spaces.\n\n"
+    # f"Note: This is mock data. Set USE_MOCK_DATA=false for real database users."
+    # )]
+    #
+    # result = {
+    # "space_id": space_id,
+    # "user_count": len(users),
+    # "users": users
+    # }
+    #
+    # if output_file:
+    # result["note"] = f"In production, output would be saved to {output_file}"
+    #
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Database Users in '{space_id}':\n\n" +
+    # json.dumps(result, indent=2) +
+    # f"\n\nNote: This is mock data. Set USE_MOCK_DATA=false for real database users."
+    # )]
+    # else:
+    # # Real CLI execution
+    # try:
+    # import subprocess
+    #
+    # logger.info(f"Executing CLI: datasphere dbusers list --space {space_id}")
+    #
+    # # Execute datasphere CLI command
+    # result = subprocess.run(
+    # ["datasphere", "dbusers", "list", "--space", space_id],
+    # capture_output=True,
+    # text=True,
+    # check=True,
+    # timeout=30
+    # )
+    #
+    # # Parse CLI output (assuming JSON format)
+    # cli_output = result.stdout.strip()
+    #
+    # if not cli_output:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"No database users found in space '{space_id}'.\n\n"
+    # f"This could mean:\n"
+    # f"- The space exists but has no database users configured\n"
+    # f"- The space ID might be incorrect\n\n"
+    # f"Use list_spaces to see available spaces."
+    # )]
+    #
+    # # Try to parse as JSON
+    # try:
+    # users_data = json.loads(cli_output)
+    # except json.JSONDecodeError:
+    # # If not JSON, return raw output
+    # users_data = {"raw_output": cli_output}
+    #
+    # response = {
+    # "space_id": space_id,
+    # "users": users_data,
+    # "source": "SAP Datasphere CLI"
+    # }
+    #
+    # if output_file:
+    # response["output_file"] = output_file
+    # response["note"] = f"To save output, redirect: datasphere dbusers list --space {space_id} > {output_file}"
+    #
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Database Users in '{space_id}':\n\n" +
+    # json.dumps(response, indent=2)
+    # )]
+    #
+    # except subprocess.CalledProcessError as e:
+    # logger.error(f"CLI command failed: {e.stderr}")
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error listing database users: {e.stderr}\n\n"
+    # f"Command: datasphere dbusers list --space {space_id}\n"
+    # f"Exit code: {e.returncode}\n\n"
+    # f"Troubleshooting:\n"
+    # f"1. Ensure datasphere CLI is installed and in PATH\n"
+    # f"2. Verify CLI is authenticated (run: datasphere login)\n"
+    # f"3. Check space ID is correct (run: datasphere spaces list)\n"
+    # f"4. Verify permissions to list database users"
+    # )]
+    # except FileNotFoundError:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error: datasphere CLI not found.\n\n"
+    # f"Please install the SAP Datasphere CLI:\n"
+    # f"1. Download from: https://help.sap.com/docs/SAP_DATASPHERE\n"
+    # f"2. Ensure it's in your system PATH\n"
+    # f"3. Authenticate with: datasphere login"
+    # )]
+    # except subprocess.TimeoutExpired:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error: CLI command timed out after 30 seconds.\n\n"
+    # f"The space may have many users, or the CLI is unresponsive."
+    # )]
+    # except Exception as e:
+    # logger.error(f"Unexpected error listing database users: {e}")
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Unexpected error listing database users: {str(e)}"
+    # )]
+    #
+    # elif name == "create_database_user":
+    # space_id = arguments["space_id"]
+    # database_user_id = arguments["database_user_id"]
+    # user_definition = arguments["user_definition"]
+    # output_file = arguments.get("output_file")
+    #
+    # if DATASPHERE_CONFIG["use_mock_data"]:
+    # # Mock mode
+    # password = secrets.token_urlsafe(16)
+    # full_username = f"{space_id}#{database_user_id}"
+    #
+    # result = {
+    # "status": "SUCCESS",
+    # "message": f"Database user '{database_user_id}' created successfully in space '{space_id}'",
+    # "user": {
+    # "user_id": database_user_id,
+    # "full_name": full_username,
+    # "status": "ACTIVE",
+    # "created_date": datetime.utcnow().isoformat() + "Z",
+    # "credentials": {
+    # "username": full_username,
+    # "password": password,
+    # "note": "IMPORTANT: Save this password securely! It will not be shown again."
+    # },
+    # "permissions": user_definition
+    # },
+    # "next_steps": [
+    # "Save the credentials securely (use output_file parameter recommended)",
+    # "Communicate password to user via secure channel (not email!)",
+    # "User must change password on first login",
+    # "Test connection with the provided credentials"
+    # ]
+    # }
+    #
+    # if output_file:
+    # result["output_file"] = output_file
+    # result["note"] = f"In production, credentials would be saved to {output_file}"
+    #
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Database User Created:\n\n" +
+    # json.dumps(result, indent=2) +
+    # f"\n\n⚠️  WARNING: This is mock data. Set USE_MOCK_DATA=false for real user creation."
+    # )]
+    # else:
+    # # Real CLI execution
+    # try:
+    # import subprocess
+    # import tempfile
+    # import os
+    #
+    # logger.info(f"Creating database user {database_user_id} in space {space_id}")
+    #
+    # # Write user definition to temporary JSON file
+    # with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+    # json.dump(user_definition, temp_file, indent=2)
+    # temp_file_path = temp_file.name
+    #
+    # try:
+    # # Execute datasphere CLI command
+    # cmd = [
+    # "datasphere", "dbusers", "create",
+    # "--space", space_id,
+    # "--databaseuser", database_user_id,
+    # "--file-path", temp_file_path
+    # ]
+    #
+    # logger.info(f"Executing CLI: {' '.join(cmd)}")
+    #
+    # result_proc = subprocess.run(
+    # cmd,
+    # capture_output=True,
+    # text=True,
+    # check=True,
+    # timeout=60
+    # )
+    #
+    # cli_output = result_proc.stdout.strip()
+    #
+    # # Try to parse CLI output
+    # try:
+    # result_data = json.loads(cli_output)
+    # except json.JSONDecodeError:
+    # result_data = {"raw_output": cli_output}
+    #
+    # response = {
+    # "status": "SUCCESS",
+    # "message": f"Database user '{database_user_id}' created successfully",
+    # "space_id": space_id,
+    # "database_user_id": database_user_id,
+    # "cli_output": result_data,
+    # "source": "SAP Datasphere CLI"
+    # }
+    #
+    # if output_file:
+    # response["output_file"] = output_file
+    # response["note"] = f"To save credentials, use CLI output redirection"
+    #
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Database User Created:\n\n" +
+    # json.dumps(response, indent=2)
+    # )]
+    #
+    # finally:
+    # # Clean up temporary file
+    # if os.path.exists(temp_file_path):
+    # os.unlink(temp_file_path)
+    #
+    # except subprocess.CalledProcessError as e:
+    # logger.error(f"CLI command failed: {e.stderr}")
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error creating database user: {e.stderr}\n\n"
+    # f"Command failed with exit code: {e.returncode}\n\n"
+    # f"Troubleshooting:\n"
+    # f"1. Verify user_definition format matches SAP requirements\n"
+    # f"2. Check permissions to create database users\n"
+    # f"3. Ensure user doesn't already exist\n"
+    # f"4. Verify space ID is correct"
+    # )]
+    # except FileNotFoundError:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error: datasphere CLI not found. Please install and configure the CLI."
+    # )]
+    # except subprocess.TimeoutExpired:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error: CLI command timed out after 60 seconds."
+    # )]
+    # except Exception as e:
+    # logger.error(f"Unexpected error creating database user: {e}")
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Unexpected error: {str(e)}"
+    # )]
+    #
+    # elif name == "reset_database_user_password":
+    # space_id = arguments["space_id"]
+    # database_user_id = arguments["database_user_id"]
+    # output_file = arguments.get("output_file")
+    #
+    # if DATASPHERE_CONFIG["use_mock_data"]:
+    # # Mock mode
+    # users = MOCK_DATA["database_users"].get(space_id, [])
+    # user = next((u for u in users if u["user_id"] == database_user_id), None)
+    #
+    # if not user:
+    # return [types.TextContent(
+    # type="text",
+    # text=f">>> User Not Found <<<\n\n"
+    # f"Database user '{database_user_id}' does not exist in space '{space_id}'.\n\n"
+    # f"Available users in {space_id}:\n" +
+    # "\n".join(f"- {u['user_id']}" for u in users) if users else "No users found." +
+    # f"\n\nNote: This is mock data. Set USE_MOCK_DATA=false for real password reset."
+    # )]
+    #
+    # new_password = secrets.token_urlsafe(16)
+    # full_username = f"{space_id}#{database_user_id}"
+    #
+    # result = {
+    # "status": "SUCCESS",
+    # "message": f"Password reset successfully for user '{database_user_id}' in space '{space_id}'",
+    # "user": {
+    # "user_id": database_user_id,
+    # "full_name": full_username,
+    # "credentials": {
+    # "username": full_username,
+    # "new_password": new_password,
+    # "note": "IMPORTANT: Save this password securely! It will not be shown again."
+    # },
+    # "reset_date": datetime.utcnow().isoformat() + "Z"
+    # },
+    # "security_actions": [
+    # "Old password invalidated immediately",
+    # "All active sessions terminated",
+    # "Password must be changed on next login",
+    # "Action logged for security audit"
+    # ],
+    # "next_steps": [
+    # "Save new credentials securely (use output_file parameter recommended)",
+    # "Communicate new password via secure channel (not email!)",
+    # "Verify user identity before sharing password",
+    # "Document password reset in change log"
+    # ]
+    # }
+    #
+    # if output_file:
+    # result["output_file"] = output_file
+    # result["note"] = f"In production, credentials would be saved to {output_file}"
+    #
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Password Reset Complete:\n\n" +
+    # json.dumps(result, indent=2) +
+    # f"\n\n⚠️  WARNING: This is mock data. Set USE_MOCK_DATA=false for real password reset."
+    # )]
+    # else:
+    # # Real CLI execution
+    # try:
+    # import subprocess
+    #
+    # logger.info(f"Resetting password for database user {database_user_id} in space {space_id}")
+    #
+    # # Execute datasphere CLI command
+    # cmd = [
+    # "datasphere", "dbusers", "password", "reset",
+    # "--space", space_id,
+    # "--databaseuser", database_user_id
+    # ]
+    #
+    # logger.info(f"Executing CLI: {' '.join(cmd)}")
+    #
+    # result_proc = subprocess.run(
+    # cmd,
+    # capture_output=True,
+    # text=True,
+    # check=True,
+    # timeout=60
+    # )
+    #
+    # cli_output = result_proc.stdout.strip()
+    #
+    # # Try to parse CLI output
+    # try:
+    # result_data = json.loads(cli_output)
+    # except json.JSONDecodeError:
+    # result_data = {"raw_output": cli_output}
+    #
+    # response = {
+    # "status": "SUCCESS",
+    # "message": f"Password reset successfully for user '{database_user_id}'",
+    # "space_id": space_id,
+    # "database_user_id": database_user_id,
+    # "cli_output": result_data,
+    # "source": "SAP Datasphere CLI",
+    # "security_note": "New password provided in CLI output - save securely!"
+    # }
+    #
+    # if output_file:
+    # response["output_file"] = output_file
+    #
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Password Reset Complete:\n\n" +
+    # json.dumps(response, indent=2)
+    # )]
+    #
+    # except subprocess.CalledProcessError as e:
+    # logger.error(f"CLI command failed: {e.stderr}")
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error resetting password: {e.stderr}\n\n"
+    # f"Command failed with exit code: {e.returncode}\n\n"
+    # f"Troubleshooting:\n"
+    # f"1. Verify user exists (use list_database_users)\n"
+    # f"2. Check permissions to reset passwords\n"
+    # f"3. Ensure CLI is authenticated"
+    # )]
+    # except FileNotFoundError:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error: datasphere CLI not found. Please install and configure the CLI."
+    # )]
+    # except subprocess.TimeoutExpired:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error: CLI command timed out after 60 seconds."
+    # )]
+    # except Exception as e:
+    # logger.error(f"Unexpected error resetting password: {e}")
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Unexpected error: {str(e)}"
+    # )]
+    #
+    # elif name == "update_database_user":
+    # space_id = arguments["space_id"]
+    # database_user_id = arguments["database_user_id"]
+    # updated_definition = arguments["updated_definition"]
+    # output_file = arguments.get("output_file")
+    #
+    # if DATASPHERE_CONFIG["use_mock_data"]:
+    # # Mock mode
+    # users = MOCK_DATA["database_users"].get(space_id, [])
+    # user = next((u for u in users if u["user_id"] == database_user_id), None)
+    #
+    # if not user:
+    # return [types.TextContent(
+    # type="text",
+    # text=f">>> User Not Found <<<\n\n"
+    # f"Database user '{database_user_id}' does not exist in space '{space_id}'.\n\n"
+    # f"Available users in {space_id}:\n" +
+    # "\n".join(f"- {u['user_id']}" for u in users) if users else "No users found." +
+    # f"\n\nNote: This is mock data. Set USE_MOCK_DATA=false for real user update."
+    # )]
+    #
+    # # Compare old and new permissions
+    # old_permissions = user.get("permissions", {})
+    #
+    # result = {
+    # "status": "SUCCESS",
+    # "message": f"Database user '{database_user_id}' updated successfully in space '{space_id}'",
+    # "user": {
+    # "user_id": database_user_id,
+    # "full_name": f"{space_id}#{database_user_id}",
+    # "updated_date": datetime.utcnow().isoformat() + "Z",
+    # "old_permissions": old_permissions,
+    # "new_permissions": updated_definition
+    # },
+    # "changes_applied": [
+    # "Permissions updated immediately",
+    # "All changes logged for audit",
+    # "Active sessions may need reconnection"
+    # ],
+    # "next_steps": [
+    # "Verify new permissions are correct",
+    # "Test user access with new configuration",
+    # "Notify user if access levels changed",
+    # "Document changes in change log"
+    # ]
+    # }
+    #
+    # if output_file:
+    # result["output_file"] = output_file
+    # result["note"] = f"In production, updated configuration would be saved to {output_file}"
+    #
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Database User Updated:\n\n" +
+    # json.dumps(result, indent=2) +
+    # f"\n\n⚠️  WARNING: This is mock data. Set USE_MOCK_DATA=false for real user update."
+    # )]
+    # else:
+    # # Real CLI execution
+    # try:
+    # import subprocess
+    # import tempfile
+    # import os
+    #
+    # logger.info(f"Updating database user {database_user_id} in space {space_id}")
+    #
+    # # Write updated definition to temporary JSON file
+    # with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+    # json.dump(updated_definition, temp_file, indent=2)
+    # temp_file_path = temp_file.name
+    #
+    # try:
+    # # Execute datasphere CLI command
+    # cmd = [
+    # "datasphere", "dbusers", "update",
+    # "--space", space_id,
+    # "--databaseuser", database_user_id,
+    # "--file-path", temp_file_path
+    # ]
+    #
+    # logger.info(f"Executing CLI: {' '.join(cmd)}")
+    #
+    # result_proc = subprocess.run(
+    # cmd,
+    # capture_output=True,
+    # text=True,
+    # check=True,
+    # timeout=60
+    # )
+    #
+    # cli_output = result_proc.stdout.strip()
+    #
+    # # Try to parse CLI output
+    # try:
+    # result_data = json.loads(cli_output)
+    # except json.JSONDecodeError:
+    # result_data = {"raw_output": cli_output}
+    #
+    # response = {
+    # "status": "SUCCESS",
+    # "message": f"Database user '{database_user_id}' updated successfully",
+    # "space_id": space_id,
+    # "database_user_id": database_user_id,
+    # "updated_definition": updated_definition,
+    # "cli_output": result_data,
+    # "source": "SAP Datasphere CLI"
+    # }
+    #
+    # if output_file:
+    # response["output_file"] = output_file
+    #
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Database User Updated:\n\n" +
+    # json.dumps(response, indent=2)
+    # )]
+    #
+    # finally:
+    # # Clean up temporary file
+    # if os.path.exists(temp_file_path):
+    # os.unlink(temp_file_path)
+    #
+    # except subprocess.CalledProcessError as e:
+    # logger.error(f"CLI command failed: {e.stderr}")
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error updating user: {e.stderr}\n\n"
+    # f"Command failed with exit code: {e.returncode}\n\n"
+    # f"Troubleshooting:\n"
+    # f"1. Verify user exists (use list_database_users)\n"
+    # f"2. Check updated_definition JSON format is correct\n"
+    # f"3. Ensure you have permissions to update users\n"
+    # f"4. Verify datasphere CLI is configured correctly"
+    # )]
+    #
+    # except FileNotFoundError:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error: SAP Datasphere CLI not found.\n\n"
+    # f"Please install the datasphere CLI:\n"
+    # f"https://help.sap.com/docs/SAP_DATASPHERE/cli"
+    # )]
+    #
+    # except subprocess.TimeoutExpired:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error: User update timed out after 60 seconds.\n\n"
+    # f"This may indicate a slow network or server issue."
+    # )]
+    #
+    # except Exception as e:
+    # logger.error(f"Unexpected error updating user: {e}")
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Unexpected error: {str(e)}"
+    # )]
+    #
+    # elif name == "delete_database_user":
+    # space_id = arguments["space_id"]
+    # database_user_id = arguments["database_user_id"]
+    # force = arguments.get("force", False)
+    #
+    # if DATASPHERE_CONFIG["use_mock_data"]:
+    # # Mock mode
+    # users = MOCK_DATA["database_users"].get(space_id, [])
+    # user = next((u for u in users if u["user_id"] == database_user_id), None)
+    #
+    # if not user:
+    # return [types.TextContent(
+    # type="text",
+    # text=f">>> User Not Found <<<\n\n"
+    # f"Database user '{database_user_id}' does not exist in space '{space_id}'.\n\n"
+    # f"Available users in {space_id}:\n" +
+    # "\n".join(f"- {u['user_id']}" for u in users) if users else "No users found." +
+    # f"\n\nNote: This is mock data. Set USE_MOCK_DATA=false for real user deletion."
+    # )]
+    #
+    # # If not forced, require explicit confirmation
+    # if not force:
+    # return [types.TextContent(
+    # type="text",
+    # text=f">>> Confirmation Required <<<\n\n"
+    # f"⚠️  WARNING: You are about to PERMANENTLY DELETE database user '{database_user_id}'.\n\n"
+    # f"User Details:\n"
+    # f"- Full Name: {user.get('full_name')}\n"
+    # f"- Status: {user.get('status')}\n"
+    # f"- Created: {user.get('created_date')}\n"
+    # f"- Last Login: {user.get('last_login')}\n"
+    # f"- Description: {user.get('description')}\n\n"
+    # f"Consequences:\n"
+    # f"- User account permanently deleted (IRREVERSIBLE)\n"
+    # f"- All active sessions terminated immediately\n"
+    # f"- All granted privileges revoked\n"
+    # f"- Cannot be recovered - must recreate if needed\n\n"
+    # f"Before Proceeding:\n"
+    # f"1. Verify no applications depend on this user\n"
+    # f"2. Check if user owns any database objects\n"
+    # f"3. Get management approval for production users\n"
+    # f"4. Document deletion reason\n\n"
+    # f"To confirm deletion, call this tool again with 'force': true\n\n"
+    # f"Note: This is mock data. Set USE_MOCK_DATA=false for real user deletion."
+    # )]
+    #
+    # # Deletion confirmed
+    # result = {
+    # "status": "SUCCESS",
+    # "message": f"Database user '{database_user_id}' deleted successfully from space '{space_id}'",
+    # "deleted_user": {
+    # "user_id": database_user_id,
+    # "full_name": f"{space_id}#{database_user_id}",
+    # "deleted_date": datetime.utcnow().isoformat() + "Z",
+    # "previous_status": user.get("status"),
+    # "created_date": user.get("created_date"),
+    # "description": user.get("description")
+    # },
+    # "actions_taken": [
+    # "User account permanently deleted",
+    # "All active sessions terminated",
+    # "All privileges revoked",
+    # "Deletion logged for audit"
+    # ],
+    # "reminder": "This action is IRREVERSIBLE. The user must be recreated if needed again."
+    # }
+    #
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Database User Deleted:\n\n" +
+    # json.dumps(result, indent=2) +
+    # f"\n\n⚠️  WARNING: This is mock data. Set USE_MOCK_DATA=false for real user deletion."
+    # )]
+    # else:
+    # # Real CLI execution
+    # try:
+    # import subprocess
+    #
+    # logger.info(f"Deleting database user {database_user_id} in space {space_id} (force={force})")
+    #
+    # # Build CLI command
+    # cmd = [
+    # "datasphere", "dbusers", "delete",
+    # "--space", space_id,
+    # "--databaseuser", database_user_id
+    # ]
+    #
+    # # Add --force flag if confirmed
+    # if force:
+    # cmd.append("--force")
+    #
+    # logger.info(f"Executing CLI: {' '.join(cmd)}")
+    #
+    # result_proc = subprocess.run(
+    # cmd,
+    # capture_output=True,
+    # text=True,
+    # check=True,
+    # timeout=60
+    # )
+    #
+    # cli_output = result_proc.stdout.strip()
+    #
+    # # Try to parse CLI output
+    # try:
+    # result_data = json.loads(cli_output)
+    # except json.JSONDecodeError:
+    # result_data = {"raw_output": cli_output}
+    #
+    # response = {
+    # "status": "SUCCESS",
+    # "message": f"Database user '{database_user_id}' deleted successfully",
+    # "space_id": space_id,
+    # "database_user_id": database_user_id,
+    # "force": force,
+    # "cli_output": result_data,
+    # "source": "SAP Datasphere CLI",
+    # "reminder": "This action is IRREVERSIBLE. User must be recreated if needed again."
+    # }
+    #
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Database User Deleted:\n\n" +
+    # json.dumps(response, indent=2)
+    # )]
+    #
+    # except subprocess.CalledProcessError as e:
+    # logger.error(f"CLI command failed: {e.stderr}")
+    #
+    # # Check if error is confirmation required
+    # if "confirmation" in e.stderr.lower() or "force" in e.stderr.lower():
+    # return [types.TextContent(
+    # type="text",
+    # text=f">>> Confirmation Required <<<\n\n"
+    # f"⚠️  WARNING: You are about to PERMANENTLY DELETE database user '{database_user_id}'.\n\n"
+    # f"Consequences:\n"
+    # f"- User account permanently deleted (IRREVERSIBLE)\n"
+    # f"- All active sessions terminated immediately\n"
+    # f"- All granted privileges revoked\n"
+    # f"- Cannot be recovered - must recreate if needed\n\n"
+    # f"Before Proceeding:\n"
+    # f"1. Verify no applications depend on this user\n"
+    # f"2. Check if user owns any database objects\n"
+    # f"3. Get management approval for production users\n"
+    # f"4. Document deletion reason\n\n"
+    # f"To confirm deletion, call this tool again with 'force': true"
+    # )]
+    #
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error deleting user: {e.stderr}\n\n"
+    # f"Command failed with exit code: {e.returncode}\n\n"
+    # f"Troubleshooting:\n"
+    # f"1. Verify user exists (use list_database_users)\n"
+    # f"2. If deletion requires confirmation, add 'force': true\n"
+    # f"3. Check you have permissions to delete users\n"
+    # f"4. Verify datasphere CLI is configured correctly"
+    # )]
+    #
+    # except FileNotFoundError:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error: SAP Datasphere CLI not found.\n\n"
+    # f"Please install the datasphere CLI:\n"
+    # f"https://help.sap.com/docs/SAP_DATASPHERE/cli"
+    # )]
+    #
+    # except subprocess.TimeoutExpired:
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Error: User deletion timed out after 60 seconds.\n\n"
+    # f"This may indicate a slow network or server issue."
+    # )]
+    #
+    # except Exception as e:
+    # logger.error(f"Unexpected error deleting user: {e}")
+    # return [types.TextContent(
+    # type="text",
+    # text=f"Unexpected error: {str(e)}"
+    # )]
+    #
+    # ============================================================
+    # END DATABASE USER MANAGEMENT HANDLERS
+    # ============================================================
 
     elif name == "list_catalog_assets":
         # Extract OData query parameters
